@@ -14,7 +14,6 @@ import {
   Terminal,
   Activity,
   Layers,
-  ChevronRight,
   RotateCcw,
   Cpu,
 } from 'lucide-react';
@@ -47,7 +46,6 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Timer while evaluating
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isEvaluating) {
@@ -58,7 +56,6 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
     return () => clearInterval(interval);
   }, [isEvaluating]);
 
-  // Determine currently active agent
   const getActiveAgentId = (): AgentId => {
     if (agentStatuses.coach === 'running') return 'coach';
     if (agentStatuses.analyzer === 'running') return 'analyzer';
@@ -73,46 +70,42 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
       case 'orchestrator':
         return {
           name: 'Orchestrator Agent',
-          badge: 'Pipeline Coordinator & Synthesis Engine',
-          icon: <Brain className="w-8 h-8 text-violet-400" />,
-          colorScheme: 'from-violet-600 via-purple-600 to-indigo-600',
-          bgGlow: 'bg-violet-500/10 border-violet-500/30',
-          pulseColor: 'bg-violet-400',
-          description:
-            'Managing agent handoffs, input-output orchestration, and synthesizing the final student cognitive profile.',
+          badge: 'Pipeline Director',
+          icon: <Brain className="w-7 h-7 text-violet-400" />,
+          colorTheme: 'from-violet-500/20 via-purple-500/10 to-transparent',
+          borderGlow: 'border-violet-500/40',
+          dotColor: 'bg-violet-400',
+          roleDesc: 'Sequencing handoffs and synthesizing holistic cognitive profile report.',
         };
       case 'designer':
         return {
           name: 'Agent 1: Assessment Designer',
-          badge: 'Reasoning Item Formulator',
-          icon: <Sparkles className="w-8 h-8 text-cyan-400" />,
-          colorScheme: 'from-cyan-600 via-teal-600 to-blue-600',
-          bgGlow: 'bg-cyan-500/10 border-cyan-500/30',
-          pulseColor: 'bg-cyan-400',
-          description:
-            'Formulating and calibrating 3 reasoning items: Logical Deductions, Numerical Patterns, and Practical Problem Solving.',
+          badge: 'Item Formulator',
+          icon: <Sparkles className="w-7 h-7 text-cyan-400" />,
+          colorTheme: 'from-cyan-500/20 via-teal-500/10 to-transparent',
+          borderGlow: 'border-cyan-500/40',
+          dotColor: 'bg-cyan-400',
+          roleDesc: 'Calibrating 3 cognitive items (Deductive logic, sequences, problem solving).',
         };
       case 'analyzer':
         return {
           name: 'Agent 2: Cognitive Response Analyzer',
-          badge: 'Evidence & Error Diagnostician',
-          icon: <Search className="w-8 h-8 text-indigo-400" />,
-          colorScheme: 'from-indigo-600 via-blue-600 to-violet-600',
-          bgGlow: 'bg-indigo-500/10 border-indigo-500/30',
-          pulseColor: 'bg-indigo-400',
-          description:
-            'Comparing student answers against expected deductions, diagnosing cognitive flaws, and identifying evidence-based strengths.',
+          badge: 'Evidence Diagnostician',
+          icon: <Search className="w-7 h-7 text-indigo-400" />,
+          colorTheme: 'from-indigo-500/20 via-blue-500/10 to-transparent',
+          borderGlow: 'border-indigo-500/40',
+          dotColor: 'bg-indigo-400',
+          roleDesc: 'Comparing student answers against logical deductions and isolating cognitive errors.',
         };
       case 'coach':
         return {
           name: 'Agent 3: Feedback Coach',
-          badge: 'Growth Strategy Architect',
-          icon: <Award className="w-8 h-8 text-emerald-400" />,
-          colorScheme: 'from-emerald-600 via-teal-600 to-green-600',
-          bgGlow: 'bg-emerald-500/10 border-emerald-500/30',
-          pulseColor: 'bg-emerald-400',
-          description:
-            'Formulating non-clinical, constructive feedback points and 3 targeted practice modules with concrete puzzle exercises.',
+          badge: 'Growth Architect',
+          icon: <Award className="w-7 h-7 text-emerald-400" />,
+          colorTheme: 'from-emerald-500/20 via-teal-500/10 to-transparent',
+          borderGlow: 'border-emerald-500/40',
+          dotColor: 'bg-emerald-400',
+          roleDesc: 'Formulating constructive cognitive strengths and 3 personalized practice drills.',
         };
     }
   };
@@ -121,142 +114,132 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   const isAllComplete = Boolean(report && !isEvaluating);
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300">
-      {/* 1. Large Hero Spotlight: "This Agent Is Working Right Now" */}
+    <div className="space-y-6">
+      {/* 1. Active Agent Spotlight Hero */}
       <div
-        className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 backdrop-blur-md shadow-2xl transition-all duration-500 ${
+        className={`relative overflow-hidden rounded-3xl border glass-card p-6 sm:p-8 shadow-2xl transition-all duration-500 ${
           isAllComplete
-            ? 'bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border-emerald-500/40'
-            : `bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${activeAgent.bgGlow}`
+            ? 'border-emerald-500/40 bg-gradient-to-r from-emerald-950/20 via-zinc-950 to-zinc-950'
+            : `${activeAgent.borderGlow} bg-gradient-to-r ${activeAgent.colorTheme}`
         }`}
       >
-        {/* Decorative backdrop glow */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="flex items-start sm:items-center gap-5">
-            {/* Animated Agent Icon with Pulse Rings */}
-            <div className="relative">
-              <div
-                className={`w-20 h-20 rounded-2xl bg-gradient-to-tr ${activeAgent.colorScheme} p-[2px] shadow-xl ${
-                  isEvaluating ? 'animate-pulse' : ''
-                }`}
-              >
-                <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                  {isAllComplete ? (
-                    <CheckCircle2 className="w-9 h-9 text-emerald-400" />
-                  ) : (
-                    activeAgent.icon
-                  )}
-                </div>
+            {/* Glowing Agent Avatar */}
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 rounded-2xl bg-zinc-950 border border-white/10 flex items-center justify-center shadow-xl">
+                {isAllComplete ? (
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                ) : (
+                  activeAgent.icon
+                )}
               </div>
               {isEvaluating && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500" />
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500" />
                 </span>
               )}
             </div>
 
-            {/* Active Agent Info */}
+            {/* Active Details */}
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  {isAllComplete ? 'Pipeline Completed' : 'Agent In Action'}
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-zinc-300">
+                  {isAllComplete ? 'Execution Finished' : 'Active Specialist'}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  Target: {studentName}
+                <span className="text-xs text-zinc-400 font-mono">
+                  Candidate: <strong className="text-zinc-200">{studentName}</strong>
                 </span>
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight">
                 {isAllComplete
-                  ? 'All 4 Agents Successfully Executed!'
+                  ? 'All 4 Agents Completed Successfully!'
                   : `${activeAgent.name} is working...`}
               </h2>
 
-              <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-xl leading-relaxed">
                 {isAllComplete
-                  ? 'The Orchestrator Agent has synthesized all outputs into the final Student Cognitive Assessment Report.'
-                  : agentActivities[activeAgentId] || activeAgent.description}
+                  ? 'Orchestrator synthesized all dimensional analytics into the final Cognitive Assessment Report.'
+                  : agentActivities[activeAgentId] || activeAgent.roleDesc}
               </p>
             </div>
           </div>
 
-          {/* Right Timer & Status Box */}
+          {/* Right Status Actions */}
           <div className="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end gap-3 shrink-0">
-            <div className="flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl font-mono text-xs">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                Elapsed:
-              </span>
-              <span className="text-white font-bold text-sm">{elapsedSeconds}s</span>
+            <div className="flex items-center gap-2.5 bg-zinc-950/80 border border-white/[0.08] px-3.5 py-2 rounded-xl font-mono text-xs text-zinc-400">
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Elapsed: <strong className="text-white font-bold">{elapsedSeconds}s</strong></span>
             </div>
 
             {isAllComplete ? (
               <button
                 onClick={onViewReport}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/25 transition animate-bounce"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 transition active:scale-[0.98]"
               >
                 <span>View Full Cognitive Report</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-indigo-300">
-                <Activity className="w-4 h-4 animate-spin text-indigo-400" />
-                <span>Processing multi-agent pipeline...</span>
+              <div className="flex items-center gap-2 text-xs font-mono text-indigo-300">
+                <Activity className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                <span>Streaming agent reasoning...</span>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* 2. Step-by-Step Multi-Agent Execution Pipeline Cards */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
-        <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+      {/* 2. Agent Pipeline Stepper Cards */}
+      <div className="glass-card rounded-2xl p-5 sm:p-6 shadow-xl">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-base font-semibold text-white">Agent Handoff Sequence</h3>
+            <Layers className="w-4 h-4 text-indigo-400" />
+            <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+              Multi-Agent Orchestration Flow
+            </h3>
           </div>
-          <span className="text-xs text-slate-400">
-            Click any agent card to inspect its exact LLM prompt & structured JSON
+          <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline">
+            Click any node to inspect prompt & JSON payload
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Agent 1 */}
           <div
             onClick={() => onInspectAgent('designer')}
-            className={`cursor-pointer rounded-xl p-4 border transition-all ${
+            className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
               agentStatuses.designer === 'running'
-                ? 'bg-cyan-950/40 border-cyan-400 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-500/20'
+                ? 'bg-cyan-950/30 border-cyan-400/80 shadow-lg shadow-cyan-500/10'
                 : agentStatuses.designer === 'completed'
-                ? 'bg-slate-950/70 border-emerald-500/40'
-                : 'bg-slate-950/40 border-slate-800'
+                ? 'bg-zinc-950/60 border-emerald-500/30 hover:border-emerald-500/60'
+                : 'bg-zinc-950/40 border-white/[0.06] hover:border-white/[0.12]'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                Agent 1: Designer
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-semibold">
+                01 Designer
               </span>
               {agentStatuses.designer === 'completed' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.designer === 'running' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-cyan-400 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" /> Active
+                <span className="text-[11px] font-mono text-cyan-400 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" /> Working
                 </span>
               ) : (
-                <span className="text-[11px] text-slate-500">Standby</span>
+                <span className="text-[11px] font-mono text-zinc-600">Standby</span>
               )}
             </div>
-            <h4 className="text-sm font-semibold text-white">3 Reasoning Items</h4>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Calibrated Logical, Pattern, and Problem-Solving questions.
+            <h4 className="text-xs font-semibold text-white">Item Formulation</h4>
+            <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">
+              Formulates calibrated reasoning items.
             </p>
-            <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-mono">Groq API</span>
+            <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono">
+              <span className="text-zinc-500">Groq API</span>
               <span className="text-indigo-400 flex items-center gap-1 font-medium">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -266,36 +249,36 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           {/* Agent 2 */}
           <div
             onClick={() => onInspectAgent('analyzer')}
-            className={`cursor-pointer rounded-xl p-4 border transition-all ${
+            className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
               agentStatuses.analyzer === 'running'
-                ? 'bg-indigo-950/40 border-indigo-400 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/20'
+                ? 'bg-indigo-950/30 border-indigo-400/80 shadow-lg shadow-indigo-500/10'
                 : agentStatuses.analyzer === 'completed'
-                ? 'bg-slate-950/70 border-emerald-500/40'
-                : 'bg-slate-950/40 border-slate-800'
+                ? 'bg-zinc-950/60 border-emerald-500/30 hover:border-emerald-500/60'
+                : 'bg-zinc-950/40 border-white/[0.06] hover:border-white/[0.12]'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                Agent 2: Analyzer
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-semibold">
+                02 Analyzer
               </span>
               {agentStatuses.analyzer === 'completed' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.analyzer === 'running' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-400 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" /> Active
+                <span className="text-[11px] font-mono text-indigo-400 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" /> Working
                 </span>
               ) : (
-                <span className="text-[11px] text-slate-500">Standby</span>
+                <span className="text-[11px] font-mono text-zinc-600">Standby</span>
               )}
             </div>
-            <h4 className="text-sm font-semibold text-white">Cognitive Diagnosis</h4>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Evaluates deductive logic, checks errors, and cites evidence.
+            <h4 className="text-xs font-semibold text-white">Cognitive Diagnosis</h4>
+            <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">
+              Evaluates deductive logic & checks fallacies.
             </p>
-            <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-mono">Groq API</span>
+            <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono">
+              <span className="text-zinc-500">Groq API</span>
               <span className="text-indigo-400 flex items-center gap-1 font-medium">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -305,36 +288,36 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           {/* Agent 3 */}
           <div
             onClick={() => onInspectAgent('coach')}
-            className={`cursor-pointer rounded-xl p-4 border transition-all ${
+            className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
               agentStatuses.coach === 'running'
-                ? 'bg-emerald-950/40 border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/20'
+                ? 'bg-emerald-950/30 border-emerald-400/80 shadow-lg shadow-emerald-500/10'
                 : agentStatuses.coach === 'completed'
-                ? 'bg-slate-950/70 border-emerald-500/40'
-                : 'bg-slate-950/40 border-slate-800'
+                ? 'bg-zinc-950/60 border-emerald-500/30 hover:border-emerald-500/60'
+                : 'bg-zinc-950/40 border-white/[0.06] hover:border-white/[0.12]'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                Agent 3: Coach
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                03 Coach
               </span>
               {agentStatuses.coach === 'completed' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.coach === 'running' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Active
+                <span className="text-[11px] font-mono text-emerald-400 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Working
                 </span>
               ) : (
-                <span className="text-[11px] text-slate-500">Standby</span>
+                <span className="text-[11px] font-mono text-zinc-600">Standby</span>
               )}
             </div>
-            <h4 className="text-sm font-semibold text-white">Coaching Roadmap</h4>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Formulates strengths, growth points, and 3 practice drills.
+            <h4 className="text-xs font-semibold text-white">Coaching Roadmap</h4>
+            <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">
+              Builds strengths and 3 actionable drills.
             </p>
-            <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-mono">Groq API</span>
+            <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono">
+              <span className="text-zinc-500">Groq API</span>
               <span className="text-indigo-400 flex items-center gap-1 font-medium">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -344,36 +327,36 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           {/* Orchestrator */}
           <div
             onClick={() => onInspectAgent('orchestrator')}
-            className={`cursor-pointer rounded-xl p-4 border transition-all ${
+            className={`cursor-pointer rounded-xl p-4 border transition-all duration-200 ${
               agentStatuses.orchestrator === 'running'
-                ? 'bg-violet-950/40 border-violet-400 ring-2 ring-violet-500/40 shadow-lg shadow-violet-500/20'
+                ? 'bg-violet-950/30 border-violet-400/80 shadow-lg shadow-violet-500/10'
                 : agentStatuses.orchestrator === 'completed'
-                ? 'bg-slate-950/70 border-emerald-500/40'
-                : 'bg-slate-950/40 border-slate-800'
+                ? 'bg-zinc-950/60 border-emerald-500/30 hover:border-emerald-500/60'
+                : 'bg-zinc-950/40 border-white/[0.06] hover:border-white/[0.12]'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 font-semibold">
                 Orchestrator
               </span>
               {agentStatuses.orchestrator === 'completed' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.orchestrator === 'running' ? (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-400 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-violet-400 animate-ping" /> Active
+                <span className="text-[11px] font-mono text-violet-400 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" /> Working
                 </span>
               ) : (
-                <span className="text-[11px] text-slate-500">Standby</span>
+                <span className="text-[11px] font-mono text-zinc-600">Standby</span>
               )}
             </div>
-            <h4 className="text-sm font-semibold text-white">Synthesis Report</h4>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Aggregates metrics and determines cognitive archetype.
+            <h4 className="text-xs font-semibold text-white">Synthesis Report</h4>
+            <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2">
+              Holistic profile & strategic takeaways.
             </p>
-            <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-mono">Groq API</span>
+            <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono">
+              <span className="text-zinc-500">Groq API</span>
               <span className="text-indigo-400 flex items-center gap-1 font-medium">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -383,60 +366,60 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
       </div>
 
       {/* 3. Live Thought Console Stream */}
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl shadow-xl overflow-hidden font-mono text-xs">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800">
+      <div className="bg-zinc-950 border border-white/[0.08] rounded-2xl shadow-xl overflow-hidden font-mono text-xs">
+        <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold text-slate-200">
-              Live Agent Execution Stream
-            </span>
+            <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-semibold text-zinc-200">Live Agent Thought Log Stream</span>
           </div>
-          <span className="text-[11px] text-slate-400 font-sans">
-            Auto-streaming real-time agent thoughts
+          <span className="text-[11px] text-zinc-500 font-sans">
+            Server-Sent Events (SSE)
           </span>
         </div>
 
-        <div className="p-4 max-h-64 overflow-y-auto space-y-2 bg-slate-950/95">
+        <div className="p-4 max-h-60 overflow-y-auto space-y-2 bg-zinc-950/95 scrollbar-thin">
           {logs.length === 0 ? (
-            <div className="py-6 text-center text-slate-500 font-sans">
+            <div className="py-6 text-center text-zinc-600 font-sans text-xs">
               Waiting for stream connection...
             </div>
           ) : (
             logs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-start gap-2.5 hover:bg-slate-900/40 p-1 rounded transition text-xs"
+                className="flex items-start gap-2.5 hover:bg-zinc-900/50 p-1 rounded transition text-xs"
               >
-                <span className="text-slate-500 text-[10px] whitespace-nowrap pt-0.5">
+                <span className="text-zinc-600 text-[10px] whitespace-nowrap pt-0.5">
                   {log.timestamp}
                 </span>
-                <span className="font-semibold text-indigo-400 whitespace-nowrap">
+                <span className="font-semibold text-indigo-400 whitespace-nowrap text-[11px]">
                   [{log.agentName}]:
                 </span>
-                <span className="text-slate-300 font-sans flex-1">{log.message}</span>
+                <span className="text-zinc-300 font-sans flex-1 leading-relaxed text-xs">
+                  {log.message}
+                </span>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* Bottom Navigation Actions */}
-      <div className="flex items-center justify-between pt-2">
+      {/* Navigation Buttons */}
+      <div className="flex items-center justify-between pt-1">
         <button
           onClick={onBackToSetup}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900/60 hover:bg-zinc-800 border border-white/[0.08] transition"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>Back to Assessment Test Form</span>
+          <span>Back to Assessment Test</span>
         </button>
 
         {isAllComplete && (
           <button
             onClick={onViewReport}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 transition"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/25 transition"
           >
-            <span>Proceed to Cognitive Report</span>
-            <ChevronRight className="w-4 h-4" />
+            <span>Proceed to Report</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         )}
       </div>

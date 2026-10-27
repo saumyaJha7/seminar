@@ -322,7 +322,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#090a0f] text-zinc-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-white relative">
+      {/* Ambient background glow and grid */}
+      <div className="fixed inset-0 ambient-glow pointer-events-none z-0" />
+      <div className="fixed inset-0 bg-grid-pattern opacity-30 pointer-events-none z-0" />
+
       {/* Top Navbar */}
       <Navbar
         hasGroqKey={isGroqConnected}
@@ -331,7 +335,7 @@ export default function Home() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 relative z-10">
         {/* Step Navigation Bar */}
         <StepProgressBar
           currentScreen={currentScreen}
