@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090a0f;
-  --foreground: #f4f4f5;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -20,40 +20,75 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Background ambient grid pattern */
-.bg-grid-pattern {
-  background-size: 32px 32px;
+/* Background ambient light pattern */
+.bg-light-pattern {
+  background-size: 28px 28px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
 }
 
-/* Ambient glow accents */
-.ambient-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.05) 35%, transparent 70%);
+/* Ambient soft gradient */
+.ambient-light-glow {
+  background: radial-gradient(circle at 50% 0%, rgba(224, 242, 254, 0.8) 0%, rgba(254, 243, 199, 0.3) 45%, transparent 75%);
 }
 
-/* Glass card styling */
-.glass-card {
-  background: rgba(18, 19, 26, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Clean white professional card */
+.pro-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
-.glass-card-hover {
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+.pro-card-hover {
+  transition: all 0.2s ease-in-out;
 }
-.glass-card-hover:hover {
-  background: rgba(24, 25, 35, 0.8);
-  border-color: rgba(255, 255, 255, 0.16);
+.pro-card-hover:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
   transform: translateY(-1px);
 }
 
-/* Ultra sleek custom scrollbar */
+/* Page Transition Animation */
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-page-enter {
+  animation: pageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Radar pulse animation */
+@keyframes radarSweep {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+.animate-radar {
+  animation: radarSweep 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+/* Clean custom scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -61,22 +96,28 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: #94a3b8;
 }
 
-/* Print styling */
+/* Print styling for professional reports */
 @media print {
-  header, footer, button, .no-print {
+  header, footer, nav, button, .no-print {
     display: none !important;
   }
 
   body {
     background: white !important;
     color: black !important;
+  }
+
+  .pro-card {
+    background: white !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
   }
 }

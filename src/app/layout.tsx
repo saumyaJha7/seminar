@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { AssessmentProvider } from '@/context/AssessmentContext';
+import { AppShell } from '@/components/AppShell';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -13,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CogniAgents | Multi-Agent Student Cognitive Assessment',
+  title: 'CognitiveAssessment | Multi-Agent Evaluation System',
   description:
-    'An Orchestrator-driven multi-agent cognitive reasoning assessment system featuring specialized AI agents for assessment design, response diagnosis, and personalized coaching.',
+    'A simple, professional Multi-Agent Student Cognitive Assessment portal powered by Groq and specialized reasoning agents.',
 };
 
 export default function RootLayout({
@@ -26,9 +28,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-950 text-slate-100">{children}</body>
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 relative">
+        <AssessmentProvider>
+          <AppShell>{children}</AppShell>
+        </AssessmentProvider>
+      </body>
     </html>
   );
 }

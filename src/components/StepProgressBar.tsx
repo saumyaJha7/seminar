@@ -28,19 +28,19 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
   }[] = [
     {
       id: 'setup',
-      number: '01',
+      number: '1',
       title: 'Assessment Input',
-      subtitle: 'Cognitive items & answers',
+      subtitle: 'Questions & candidate answers',
       icon: <FileEdit className="w-3.5 h-3.5" />,
       isAvailable: true,
     },
     {
       id: 'working',
-      number: '02',
-      title: 'Neural Pipeline',
-      subtitle: 'Live agents executing',
+      number: '2',
+      title: 'Agent Pipeline',
+      subtitle: 'Live reasoning & diagnostics',
       icon: isProcessing ? (
-        <Sparkles className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+        <Sparkles className="w-3.5 h-3.5 animate-spin text-blue-600" />
       ) : (
         <Cpu className="w-3.5 h-3.5" />
       ),
@@ -48,17 +48,17 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
     },
     {
       id: 'report',
-      number: '03',
+      number: '3',
       title: 'Diagnostic Report',
-      subtitle: 'Synthesized intelligence',
+      subtitle: 'Cognitive profile & coaching',
       icon: <Award className="w-3.5 h-3.5" />,
       isAvailable: hasReport,
     },
   ];
 
   return (
-    <div className="w-full bg-zinc-950/60 p-1.5 rounded-2xl border border-white/[0.07] backdrop-blur-xl shadow-xl">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+    <div className="w-full bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {steps.map((step) => {
           const isActive = currentScreen === step.id;
           const isDone =
@@ -70,27 +70,27 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
               key={step.id}
               disabled={!step.isAvailable}
               onClick={() => onNavigate(step.id)}
-              className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all duration-300 ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                 isActive
-                  ? 'bg-zinc-900 border border-white/[0.12] shadow-lg shadow-black/40 text-white'
+                  ? 'bg-blue-50/80 border border-blue-400 shadow-xs text-blue-900'
                   : isDone
-                  ? 'bg-zinc-950/40 hover:bg-zinc-900/40 border border-transparent text-zinc-400 hover:text-zinc-200 cursor-pointer'
+                  ? 'bg-slate-50 hover:bg-slate-100/70 border border-slate-200 text-slate-700 cursor-pointer'
                   : step.isAvailable
-                  ? 'bg-zinc-950/20 hover:bg-zinc-900/30 border border-transparent text-zinc-500 hover:text-zinc-300 cursor-pointer'
-                  : 'opacity-40 text-zinc-600 border border-transparent cursor-not-allowed'
+                  ? 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 cursor-pointer'
+                  : 'bg-slate-50/50 border border-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
               }`}
             >
-              {/* Step indicator badge */}
+              {/* Number icon badge */}
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs font-bold shrink-0 transition-all ${
+                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)]'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : isDone
-                    ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-zinc-900 text-zinc-500 border border-white/[0.06]'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
                 }`}
               >
-                {isDone ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : step.number}
+                {isDone ? <Check className="w-4 h-4 stroke-[2.5]" /> : step.number}
               </div>
 
               {/* Title & subtitle */}
@@ -98,16 +98,16 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`text-xs font-semibold truncate ${
-                      isActive ? 'text-white' : isDone ? 'text-zinc-200' : 'text-zinc-400'
+                      isActive ? 'text-blue-900' : isDone ? 'text-slate-800' : 'text-slate-700'
                     }`}
                   >
                     {step.title}
                   </span>
                   {isActive && isProcessing && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping shrink-0" />
                   )}
                 </div>
-                <p className="text-[10px] text-zinc-500 truncate font-mono">
+                <p className="text-[11px] text-slate-500 truncate">
                   {step.subtitle}
                 </p>
               </div>
