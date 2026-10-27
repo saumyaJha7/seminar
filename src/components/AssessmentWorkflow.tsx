@@ -262,7 +262,12 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                       rows={2}
                       value={currentAns}
                       onChange={(e) => handleAnswerChange(q.id, 'answer', e.target.value)}
-                      placeholder="e.g. Yes, Dr. Miller is a physicist..."
+                      onKeyDown={(e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                          handleSubmit(e);
+                        }
+                      }}
+                      placeholder="e.g. Yes, Dr. Miller is a physicist... (Press Ctrl+Enter to run)"
                       className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition resize-none"
                     />
                   </div>
@@ -276,7 +281,12 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                       rows={2}
                       value={currentReasoning}
                       onChange={(e) => handleAnswerChange(q.id, 'reasoning', e.target.value)}
-                      placeholder="e.g. I deduced this because premise A implies..."
+                      onKeyDown={(e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                          handleSubmit(e);
+                        }
+                      }}
+                      placeholder="e.g. I deduced this because premise A implies... (Press Ctrl+Enter to run)"
                       className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition resize-none"
                     />
                   </div>

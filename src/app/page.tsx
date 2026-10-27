@@ -2,24 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '@/components/Navbar';
-import { AgentPipelineVisualizer } from '@/components/AgentPipelineVisualizer';
+import { StepProgressBar, AppScreen } from '@/components/StepProgressBar';
 import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
+import { AgentWorkingScreen } from '@/components/AgentWorkingScreen';
 import { CognitiveReportView } from '@/components/CognitiveReportView';
-import { LiveAgentConsole } from '@/components/LiveAgentConsole';
 import { AgentInspectorModal } from '@/components/AgentInspectorModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { ArchitectureModal } from '@/components/ArchitectureModal';
 import { AgentId, AgentLogEntry, AgentStatus, FinalAssessmentReport, Question, StudentAnswer } from '@/types/assessment';
 import { getSimulatedQuestions } from '@/lib/agents/designer';
-import { Brain, Sparkles, CheckCircle, Info } from 'lucide-react';
+import { Sparkles, Info } from 'lucide-react';
 
 export default function Home() {
+  // Navigation Screen State
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>('setup');
+
   // App Config & Credentials
   const [hasServerGroqKey, setHasServerGroqKey] = useState<boolean>(false);
   const [clientGroqKey, setClientGroqKey] = useState<string>('');
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState<boolean>(false);
   const [inspectingAgentId, setInspectingAgentId] = useState<AgentId | null>(null);
+
+  // Student details state
+  const [activeStudentName, setActiveStudentName] = useState<string>('Alex Mercer');
 
   // Agent Pipeline States
   const [agentStatuses, setAgentStatuses] = useState<Record<AgentId, AgentStatus>>({
@@ -138,7 +144,7 @@ export default function Home() {
       } else {
         throw new Error(data.error || 'Failed to generate questions');
       }
-    } catch (err: any) {
+    } catch {
       setAgentStatuses((prev) => ({ ...prev, designer: 'error' }));
       setAgentActivities((prev) => ({ ...prev, designer: 'Question generation error' }));
     } finally {
@@ -146,7 +152,7 @@ export default function Home() {
     }
   };
 
-  // Run full assessment pipeline via SSE stream
+  // Run full assessment pipeline via SSE stream and navigate to 'working' screen
   const handleSubmitAssessment = async (params: {
     studentName: string;
     gradeLevel: string;
@@ -154,8 +160,14 @@ export default function Home() {
     questions: Question[];
     studentAnswers: StudentAnswer[];
   }) => {
+    setActiveStudentName(params.studentName);
     setIsEvaluating(true);
     setReport(null);
+    setLogs([]);
+
+    // Immediately switch to the dedicated Agent Working Screen!
+    setCurrentScreen('working');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Reset status
     setAgentStatuses({
@@ -274,7 +286,7 @@ export default function Home() {
                   },
                 ]);
               }
-            } catch (err) {
+            } catch {
               // ignore parse errors
             }
           }
@@ -297,7 +309,8 @@ export default function Home() {
     }
   };
 
-  const handleReset = () => {
+  const handleResetToSetup = () => {
+    setCurrentScreen('setup');
     setReport(null);
     setAgentStatuses({
       orchestrator: 'idle',
@@ -305,17 +318,12 @@ export default function Home() {
       analyzer: 'idle',
       coach: 'idle',
     });
-    setAgentActivities({
-      orchestrator: 'Ready to coordinate multi-agent workflow',
-      designer: 'Questions ready',
-      analyzer: 'Awaiting student answers',
-      coach: 'Awaiting analyzer findings',
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Navbar */}
+      {/* Top Navbar */}
       <Navbar
         hasGroqKey={isGroqConnected}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
@@ -323,64 +331,94 @@ export default function Home() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Intro Hero Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              Multi-Agent Cognitive Reasoning Architecture
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Student Cognitive Assessment
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
-              An Orchestrator coordinates 3 specialized AI agents (Item Designer, Cognitive Response Analyzer, and Feedback Coach) powered by Groq to diagnose reasoning patterns and generate actionable growth plans.
-            </p>
-          </div>
-
-          {!isGroqConnected && (
-            <div
-              onClick={() => setIsApiKeyModalOpen(true)}
-              className="cursor-pointer p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-3 hover:bg-amber-900/30 transition shadow-lg"
-            >
-              <Info className="w-4 h-4 text-amber-400 shrink-0" />
-              <div>
-                <p className="font-semibold text-amber-300">Running in Demo Mode</p>
-                <p className="text-[11px] text-amber-400/80">Click here or paste GROQ_API_KEY in .env for live LLM inference</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 1. Multi-Agent Pipeline Visualization Graph */}
-        <AgentPipelineVisualizer
-          agentStatuses={agentStatuses}
-          agentExecutionTimes={agentExecutionTimes}
-          agentActivities={agentActivities}
-          onInspectAgent={(id) => setInspectingAgentId(id)}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Step Navigation Bar */}
+        <StepProgressBar
+          currentScreen={currentScreen}
+          onNavigate={(screen) => {
+            setCurrentScreen(screen);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          hasReport={Boolean(report)}
+          isProcessing={isEvaluating}
         />
 
-        {/* 2. Interactive Assessment Workflow OR Report View */}
-        {report ? (
-          <CognitiveReportView report={report} onNewAssessment={handleReset} />
-        ) : (
-          <AssessmentWorkflow
-            questions={questions}
-            onGenerateQuestions={handleGenerateQuestions}
-            onSubmitAssessment={handleSubmitAssessment}
-            isGeneratingQuestions={isGeneratingQuestions}
+        {/* SCREEN 1: Assessment Setup & Question Input */}
+        {currentScreen === 'setup' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header intro */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 mb-2">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Screen 1: Assessment Input & Configuration
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  Student Cognitive Assessment
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
+                  Configure student reasoning questions, input answers or select quick presets, and press Enter to launch the multi-agent assessment pipeline.
+                </p>
+              </div>
+
+              {!isGroqConnected && (
+                <div
+                  onClick={() => setIsApiKeyModalOpen(true)}
+                  className="cursor-pointer p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-3 hover:bg-amber-900/30 transition shadow-lg"
+                >
+                  <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-amber-300">Simulation Mode</p>
+                    <p className="text-[11px] text-amber-400/80">Add GROQ_API_KEY for live Groq LLM inference</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <AssessmentWorkflow
+              questions={questions}
+              onGenerateQuestions={handleGenerateQuestions}
+              onSubmitAssessment={handleSubmitAssessment}
+              isGeneratingQuestions={isGeneratingQuestions}
+              isEvaluating={isEvaluating}
+              onReset={() => {
+                setQuestions(getSimulatedQuestions('intermediate'));
+              }}
+            />
+          </div>
+        )}
+
+        {/* SCREEN 2: Multi-Agent Working Screen */}
+        {currentScreen === 'working' && (
+          <AgentWorkingScreen
+            studentName={activeStudentName}
+            agentStatuses={agentStatuses}
+            agentExecutionTimes={agentExecutionTimes}
+            agentActivities={agentActivities}
+            logs={logs}
             isEvaluating={isEvaluating}
-            onReset={handleReset}
+            report={report}
+            onInspectAgent={(id) => setInspectingAgentId(id)}
+            onViewReport={() => {
+              setCurrentScreen('report');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBackToSetup={() => {
+              setCurrentScreen('setup');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
-        {/* 3. Live Streaming Agent Activity Console */}
-        <LiveAgentConsole
-          logs={logs}
-          onClearLogs={() => setLogs([])}
-          isRunning={isEvaluating || isGeneratingQuestions}
-        />
+        {/* SCREEN 3: Comprehensive Final Cognitive Report */}
+        {currentScreen === 'report' && report && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <CognitiveReportView
+              report={report}
+              onNewAssessment={handleResetToSetup}
+            />
+          </div>
+        )}
       </main>
 
       {/* Modals */}
@@ -403,9 +441,9 @@ export default function Home() {
         onClose={() => setIsArchitectureModalOpen(false)}
       />
 
-      {/* Minimal Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <p>CogniAgents • Multi-Agent Cognitive Assessment System • Inspired by n8n Workflow Architecture</p>
+      {/* Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-5 text-center text-xs text-slate-500">
+        <p>CogniAgents • Multi-Agent Cognitive Assessment System • Next.js & Groq</p>
       </footer>
     </div>
   );
