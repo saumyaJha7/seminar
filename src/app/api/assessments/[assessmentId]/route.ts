@@ -19,6 +19,7 @@ export async function GET(_request: Request, context: RouteContext) {
         assessment: {
           id: assessment.id,
           status: assessment.status,
+          pauseRequested: assessment.pauseRequested,
           mode: assessment.mode,
           createdAt: assessment.createdAt,
           updatedAt: assessment.updatedAt,

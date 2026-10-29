@@ -3,7 +3,7 @@
 import React from 'react';
 import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
 import { useAssessment } from '@/context/AssessmentContext';
-import { Sparkles, Info } from 'lucide-react';
+import { Sparkles, Info, Brain, Layers } from 'lucide-react';
 
 export default function HomePage() {
   const {
@@ -34,35 +34,55 @@ export default function HomePage() {
   const isGroqConnected = hasServerGroqKey;
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-700 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            Step 1 • Student Assessment Setup
+    <div className="assessment-workspace relative isolate -mx-2 space-y-5 rounded-[2rem] p-3 sm:-mx-3 sm:p-5 lg:p-6">
+      <header className="assessment-hero relative isolate overflow-hidden rounded-[1.75rem] border border-blue-950/20 px-5 py-6 text-white shadow-xl shadow-blue-950/10 sm:px-8 sm:py-8">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-28 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-100">
+              <Sparkles className="h-3.5 w-3.5" />
+              Step 01 · Assessment workspace
+            </div>
+            <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+              Build a clearer picture of how a student thinks.
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-blue-100/90 sm:text-base">
+              Set the learning context, prepare reasoning questions, and capture the thinking behind each answer before the agents begin.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Student Cognitive Assessment
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-            Configure reasoning items, provide student answers or select quick test presets, and launch the multi-agent assessment pipeline.
-          </p>
-        </div>
 
-        {!isGroqConnected && (
-          <div
-            onClick={() => setIsApiKeyModalOpen(true)}
-            className="cursor-pointer p-3.5 rounded-2xl bg-orange-50 border border-orange-200 text-orange-900 text-xs flex items-center gap-3 hover:bg-orange-100/70 transition shadow-xs shrink-0"
-          >
-            <Info className="w-4 h-4 text-orange-600 shrink-0" />
-            <div>
-              <p className="font-bold text-orange-900 text-xs">Demo Mode Active</p>
-              <p className="text-[11px] text-orange-800">Click to configure your free Groq API key</p>
+          <div className="grid grid-cols-2 gap-2.5 lg:min-w-64">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3.5 backdrop-blur-sm">
+              <Brain className="mb-2 h-4 w-4 text-cyan-200" />
+              <p className="text-lg font-bold leading-none">3</p>
+              <p className="mt-1 text-xs text-blue-100">Reasoning domains</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3.5 backdrop-blur-sm">
+              <Layers className="mb-2 h-4 w-4 text-violet-200" />
+              <p className="text-lg font-bold leading-none">6</p>
+              <p className="mt-1 text-xs text-blue-100">Thinking levels</p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </header>
+
+      {!isGroqConnected && (
+        <button
+          type="button"
+          onClick={() => setIsApiKeyModalOpen(true)}
+          className="flex w-full items-center gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-3.5 text-left text-orange-900 shadow-xs transition hover:border-orange-300 hover:shadow-sm"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-orange-600 shadow-xs">
+            <Info className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-bold">Demo Mode Active</span>
+            <span className="mt-0.5 block text-xs text-orange-800">Configure a Groq API key to use live agent responses.</span>
+          </span>
+          <span className="hidden text-xs font-semibold text-orange-800 sm:block">Configure</span>
+        </button>
+      )}
 
       {/* Main Workflow Form */}
       <AssessmentWorkflow

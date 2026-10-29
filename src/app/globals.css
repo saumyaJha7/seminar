@@ -79,11 +79,63 @@ body {
   transform: translateY(-1px);
 }
 
+.assessment-workspace {
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(125, 211, 252, 0.3), transparent 34rem),
+    radial-gradient(ellipse at 96% 28%, rgba(196, 181, 253, 0.3), transparent 32rem),
+    linear-gradient(140deg, #eff8ff 0%, #f1f0ff 54%, #fff8ec 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.assessment-hero {
+  background: linear-gradient(118deg, #102247 0%, #214b90 58%, #3b5ea7 100%);
+}
+
+.pipeline-route-banner {
+  background: linear-gradient(118deg, #101a35 0%, #252b66 52%, #174e74 100%);
+}
+
+.pipeline-sequence-panel {
+  background:
+    radial-gradient(ellipse at 96% 0%, rgba(199, 210, 254, 0.32), transparent 26rem),
+    linear-gradient(145deg, #ffffff 0%, #f7f8ff 60%, #f0f9ff 100%);
+}
+
 /* Page Transition Animation */
 @keyframes pageSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.99);
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageSlideIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes agentStageSwitch {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-agent-switch {
+  animation: agentStageSwitch 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes agentStageArrival {
+  from {
+    opacity: 0.75;
+    transform: translateY(3px) scale(0.99);
   }
   to {
     opacity: 1;
@@ -91,8 +143,8 @@ body {
   }
 }
 
-.animate-page-enter {
-  animation: pageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.agent-stage-enter {
+  animation: agentStageArrival 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Radar pulse animation */

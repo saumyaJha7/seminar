@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import {
   AssessmentLifecycleStatus,
   AssessmentMode,
+  AssessmentPipelineCheckpoint,
   AssessmentProgressEvent,
   AssessmentRecord,
   BLOOM_LEVELS,
@@ -48,13 +49,15 @@ interface AssessmentRow {
   question_count: number;
   target_bloom_levels: string;
   failure_stage: string | null;
+  pipeline_checkpoint: string | null;
+  pause_requested: number;
 }
 
 const globalForAssessmentDb = globalThis as typeof globalThis & {
   assessmentDatabase?: DatabaseConnection;
   assessmentSchemaVersion?: number;
 };
-const ASSESSMENT_SCHEMA_VERSION = 1;
+const ASSESSMENT_SCHEMA_VERSION = 2;
 const ASSESSMENT_CREATION_LIMIT = 10;
 const ASSESSMENT_CREATION_WINDOW_MS = 15 * 60 * 1000;
 
@@ -73,7 +76,9 @@ function initializeDatabase(database: DatabaseConnection): void {
       focus_area TEXT NOT NULL,
       question_count INTEGER NOT NULL DEFAULT 3,
       target_bloom_levels TEXT NOT NULL DEFAULT '["analyze","evaluate"]',
-      failure_stage TEXT
+      failure_stage TEXT,
+      pipeline_checkpoint TEXT,
+      pause_requested INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS assessment_questions (
       assessment_id TEXT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
@@ -122,6 +127,12 @@ function initializeDatabase(database: DatabaseConnection): void {
   }
   if (!assessmentColumns.some((column) => column.name === 'target_bloom_levels')) {
     database.exec(`ALTER TABLE assessments ADD COLUMN target_bloom_levels TEXT NOT NULL DEFAULT '["analyze","evaluate"]'`);
+  }
+  if (!assessmentColumns.some((column) => column.name === 'pipeline_checkpoint')) {
+    database.exec('ALTER TABLE assessments ADD COLUMN pipeline_checkpoint TEXT');
+  }
+  if (!assessmentColumns.some((column) => column.name === 'pause_requested')) {
+    database.exec('ALTER TABLE assessments ADD COLUMN pause_requested INTEGER NOT NULL DEFAULT 0');
   }
 }
 
@@ -410,6 +421,10 @@ export function getAssessment(assessmentId: string): AssessmentRecord | null {
       ...(event.agent_id ? { agentId: event.agent_id } : {}),
     })),
     report: reportRow ? JSON.parse(reportRow.report_json) as FinalAssessmentReport : null,
+    ...(row.pipeline_checkpoint
+      ? { pipelineCheckpoint: JSON.parse(row.pipeline_checkpoint) as AssessmentPipelineCheckpoint }
+      : {}),
+    pauseRequested: row.pause_requested === 1,
     ...(row.failure_stage ? { failureStage: row.failure_stage } : {}),
   };
 }
@@ -427,11 +442,12 @@ export function updateAssessmentStatus(
   if (!current) throw new Error('Assessment was not found.');
 
   const allowed: Record<AssessmentLifecycleStatus, AssessmentLifecycleStatus[]> = {
-    queued: ['generating_questions', 'evaluating', 'failed'],
+    queued: ['generating_questions', 'evaluating', 'generating_report', 'failed'],
     generating_questions: ['awaiting_answers', 'failed'],
     awaiting_answers: ['queued', 'failed'],
-    evaluating: ['generating_report', 'failed'],
-    generating_report: ['completed', 'failed'],
+    evaluating: ['generating_report', 'paused', 'failed'],
+    generating_report: ['paused', 'completed', 'failed'],
+    paused: ['queued'],
     completed: [],
     failed: ['queued', 'generating_questions'],
   };
@@ -453,6 +469,80 @@ export function updateAssessmentStatus(
     );
   });
   transaction();
+}
+
+export function requestAssessmentPause(assessmentId: string): 'requested' | 'paused' | 'not_running' | 'not_found' {
+  const database = getDatabase();
+  return database.transaction(() => {
+    const assessment = database.prepare(
+      'SELECT status, pause_requested, pipeline_checkpoint FROM assessments WHERE id = ?',
+    ).get(assessmentId) as {
+      status: AssessmentLifecycleStatus;
+      pause_requested: number;
+      pipeline_checkpoint: string | null;
+    } | undefined;
+    if (!assessment) return 'not_found';
+    if (assessment.status === 'paused') return 'paused';
+    if (!['queued', 'evaluating', 'generating_report'].includes(assessment.status)) return 'not_running';
+    if (
+      assessment.status === 'generating_report' &&
+      assessment.pipeline_checkpoint &&
+      (JSON.parse(assessment.pipeline_checkpoint) as AssessmentPipelineCheckpoint).nextStage === 'save_report'
+    ) {
+      return 'not_running';
+    }
+    if (assessment.pause_requested === 1) return 'requested';
+
+    database.prepare('UPDATE assessments SET pause_requested = 1, updated_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), assessmentId);
+    addEvent(database, assessmentId, 'pause', 'waiting', 'Pause requested; the active agent will finish before execution stops.');
+    return 'requested';
+  })();
+}
+
+export function saveAssessmentCheckpoint(
+  assessmentId: string,
+  checkpoint: AssessmentPipelineCheckpoint,
+): boolean {
+  const database = getDatabase();
+  return database.transaction(() => {
+    const assessment = database.prepare(
+      'SELECT status, pause_requested FROM assessments WHERE id = ?',
+    ).get(assessmentId) as { status: AssessmentLifecycleStatus; pause_requested: number } | undefined;
+    if (!assessment || !['evaluating', 'generating_report'].includes(assessment.status)) {
+      throw new Error('Assessment is not processing and cannot save a pipeline checkpoint.');
+    }
+
+    const timestamp = new Date().toISOString();
+    database.prepare(`
+      UPDATE assessments
+      SET pipeline_checkpoint = ?, updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(checkpoint), timestamp, assessmentId);
+
+    if (assessment.pause_requested !== 1) return false;
+
+    const nextAgent = checkpoint.nextStage === 'coach'
+      ? 'Feedback Coach'
+      : checkpoint.nextStage === 'synthesis'
+        ? 'Orchestrator'
+        : checkpoint.nextStage === 'save_report'
+          ? 'report saving'
+          : 'Cognitive Analyzer';
+    database.prepare(`
+      UPDATE assessments
+      SET status = 'paused', pause_requested = 0, updated_at = ?
+      WHERE id = ?
+    `).run(timestamp, assessmentId);
+    addEvent(
+      database,
+      assessmentId,
+      'pause',
+      'completed',
+      `Execution paused safely. Resume to continue with ${nextAgent}.`,
+    );
+    return true;
+  })();
 }
 
 export function appendAssessmentEvent(
@@ -503,7 +593,7 @@ export function saveAssessmentAnswers(
     database.prepare(`
       UPDATE assessments
       SET student_name = ?, grade_level = ?, difficulty = ?, focus_area = ?,
-          status = 'queued', updated_at = ?
+          status = 'queued', updated_at = ?, pipeline_checkpoint = NULL, pause_requested = 0
       WHERE id = ?
     `).run(studentName, gradeLevel, difficulty, focusArea, new Date().toISOString(), assessmentId);
     addEvent(database, assessmentId, 'answers', 'completed', 'Student answers saved for evaluation.');
@@ -542,7 +632,8 @@ export function saveAssessmentReport(
       VALUES (?, ?)
     `).run(assessmentId, JSON.stringify(report));
     const result = database.prepare(`
-      UPDATE assessments SET status = 'completed', updated_at = ?, failure_stage = NULL
+      UPDATE assessments
+      SET status = 'completed', updated_at = ?, failure_stage = NULL, pause_requested = 0
       WHERE id = ? AND status = 'generating_report'
     `).run(new Date().toISOString(), assessmentId);
     if (result.changes !== 1) {

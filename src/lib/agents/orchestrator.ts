@@ -1,7 +1,11 @@
 import {
   AgentId,
   AgentLogEntry,
+  AssessmentPipelineCheckpoint,
+  CognitiveAnalysisResult,
+  FeedbackCoachResult,
   FinalAssessmentReport,
+  OrchestratorSynthesis,
   Question,
   StudentAnswer,
 } from '@/types/assessment';
@@ -13,24 +17,7 @@ import { validateOrchestratorSynthesis } from '../assessment-contracts';
 
 export type LogCallback = (entry: AgentLogEntry) => void;
 
-export const ORCHESTRATOR_SYSTEM_PROMPT = `You are the Orchestrator Agent in a Multi-Agent Student Cognitive Assessment system.
-Your responsibility:
-- Oversee the entire workflow: Agent 1 (Designer) -> Student Answers -> Agent 2 (Analyzer) -> Agent 3 (Coach).
-- Synthesize all findings into an Executive Cognitive Profile.
-- Classify the student's cognitive archetype (e.g. "Systematic Deductive Thinker", "Intuitive Pattern Seeker", "Pragmatic Problem Solver", "Emerging Analytical Reasoner").
-- Provide an overarching executive summary and a key strategic takeaway for educators or parents.
-- Output MUST be valid JSON adhering strictly to the requested schema.`;
-
-export async function runFullAssessmentPipeline({
-  studentName = 'Alex Mercer',
-  gradeLevel = 'High School',
-  difficulty = 'intermediate',
-  focusArea = 'Logic & Pattern Recognition',
-  preExistingQuestions,
-  studentAnswers,
-  onLog,
-  assessmentId,
-}: {
+export interface AssessmentPipelineInput {
   studentName?: string;
   gradeLevel?: string;
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
@@ -39,7 +26,34 @@ export async function runFullAssessmentPipeline({
   studentAnswers: StudentAnswer[];
   onLog?: LogCallback;
   assessmentId?: string;
-}): Promise<FinalAssessmentReport> {
+  checkpoint?: AssessmentPipelineCheckpoint;
+  onCheckpoint?: (checkpoint: AssessmentPipelineCheckpoint) => Promise<boolean>;
+}
+
+export type AssessmentPipelineResult =
+  | { paused: true; checkpoint: AssessmentPipelineCheckpoint }
+  | { paused: false; report: FinalAssessmentReport };
+
+export const ORCHESTRATOR_SYSTEM_PROMPT = `You are the Orchestrator Agent in a Multi-Agent Student Cognitive Assessment system.
+Your responsibility:
+- Oversee the entire workflow: Agent 1 (Designer) -> Student Answers -> Agent 2 (Analyzer) -> Agent 3 (Coach).
+- Synthesize all findings into an Executive Cognitive Profile.
+- Classify the student's cognitive archetype (e.g. "Systematic Deductive Thinker", "Intuitive Pattern Seeker", "Pragmatic Problem Solver", "Emerging Analytical Reasoner").
+- Provide an overarching executive summary and a key strategic takeaway for educators or parents.
+- Output MUST be valid JSON adhering strictly to the requested schema.`;
+
+export async function runAssessmentPipeline({
+  studentName = 'Alex Mercer',
+  gradeLevel = 'High School',
+  difficulty = 'intermediate',
+  focusArea = 'Logic & Pattern Recognition',
+  preExistingQuestions,
+  studentAnswers,
+  onLog,
+  assessmentId,
+  checkpoint = { nextStage: 'analyzer' },
+  onCheckpoint,
+}: AssessmentPipelineInput): Promise<AssessmentPipelineResult> {
   const emitLog = (
     agentId: AgentId,
     agentName: string,
@@ -80,47 +94,77 @@ export async function runFullAssessmentPipeline({
     });
   }
 
-  // Step 2: Validate student answers
-  emitLog('orchestrator', 'Orchestrator Agent', 'action', `Dispatching ${questions.length} question-answer pairs to Agent 2 (Cognitive Response Analyzer)...`);
+  let analysis: CognitiveAnalysisResult | undefined = checkpoint.analysis;
+  if (!analysis) {
+    emitLog('orchestrator', 'Orchestrator Agent', 'action', `Dispatching ${questions.length} question-answer pairs to Agent 2 (Cognitive Response Analyzer)...`);
+    emitLog('analyzer', 'Agent 2: Cognitive Response Analyzer', 'action', 'Evaluating submitted answers against the question rubrics.');
+    const analyzerResult = await runCognitiveResponseAnalyzer({
+      studentName,
+      questions,
+      studentAnswers,
+    });
+    analysis = analyzerResult.analysis;
+    const nextCheckpoint: AssessmentPipelineCheckpoint = {
+      ...checkpoint,
+      nextStage: 'coach',
+      analysis,
+    };
+    emitLog(
+      'analyzer',
+      'Agent 2: Cognitive Response Analyzer',
+      'success',
+      analysis.evaluations.some((evaluation) => evaluation.answerCorrectness !== 'unanswered')
+        ? `Cognitive analysis complete! Overall Score: ${analysis.overallScore}/100 in ${analyzerResult.executionTimeMs}ms.`
+        : 'Cognitive analysis complete; no responses were available for scoring.',
+      { scores: analysis.categoryScores },
+    );
+    if (await onCheckpoint?.(nextCheckpoint)) {
+      return { paused: true, checkpoint: nextCheckpoint };
+    }
+    checkpoint = nextCheckpoint;
+  }
 
-  // Step 3: Agent 2 Cognitive Response Analyzer
-  emitLog('analyzer', 'Agent 2: Cognitive Response Analyzer', 'action', 'Evaluating submitted answers against the question rubrics.');
-  const analyzerResult = await runCognitiveResponseAnalyzer({
-    studentName,
-    questions,
-    studentAnswers,
-  });
-  const answeredCount = analyzerResult.analysis.evaluations.filter(
+  if (!analysis) {
+    throw new Error('Assessment checkpoint is missing cognitive analysis.');
+  }
+
+  const answeredCount = analysis.evaluations.filter(
     (evaluation) => evaluation.answerCorrectness !== 'unanswered',
   ).length;
-  emitLog(
-    'analyzer',
-    'Agent 2: Cognitive Response Analyzer',
-    'success',
-    answeredCount > 0
-      ? `Cognitive analysis complete! Overall Score: ${analyzerResult.analysis.overallScore}/100 in ${analyzerResult.executionTimeMs}ms.`
-      : 'Cognitive analysis complete; no responses were available for scoring.',
-    {
-      scores: analyzerResult.analysis.categoryScores,
+
+  let feedback: FeedbackCoachResult | undefined = checkpoint.feedback;
+  if (!feedback) {
+    emitLog('coach', 'Agent 3: Feedback Coach', 'action', 'Formulating a constructive growth roadmap and practice modules.');
+    const coachResult = await runFeedbackCoach({ analysis });
+    feedback = coachResult.feedback;
+    const nextCheckpoint: AssessmentPipelineCheckpoint = {
+      ...checkpoint,
+      nextStage: 'synthesis',
+      analysis,
+      feedback,
+    };
+    emitLog(
+      'coach',
+      'Agent 3: Feedback Coach',
+      'success',
+      `Personalized coaching plan created with ${feedback.practiceSuggestions.length} targeted exercises in ${coachResult.executionTimeMs}ms.`,
+    );
+    if (await onCheckpoint?.(nextCheckpoint)) {
+      return { paused: true, checkpoint: nextCheckpoint };
     }
-  );
+    checkpoint = nextCheckpoint;
+  }
 
-  // Step 4: Agent 3 Feedback Coach
-  emitLog('coach', 'Agent 3: Feedback Coach', 'action', `Formulating non-clinical, constructive growth roadmap & practice modules...`);
-  const coachResult = await runFeedbackCoach({
-    analysis: analyzerResult.analysis,
-  });
-  emitLog('coach', 'Agent 3: Feedback Coach', 'success', `Personalized coaching plan created with ${coachResult.feedback.practiceSuggestions.length} targeted exercises in ${coachResult.executionTimeMs}ms.`);
-
-  // Step 5: Orchestrator Synthesis
-  emitLog('orchestrator', 'Orchestrator Agent', 'action', 'Synthesizing the validated agent results into a report.');
-  const synthesisPrompt = `Student Name: ${studentName}
-Overall Cognitive Score: ${analyzerResult.analysis.overallScore}
-Answered Items: ${answeredCount} of ${analyzerResult.analysis.evaluations.length}
-Category Scores: ${JSON.stringify(analyzerResult.analysis.categoryScores)}
-Analyzer Evaluations: ${JSON.stringify(analyzerResult.analysis.evaluations.map(e => ({ q: e.categoryTitle, score: e.score, strengths: e.demonstratedStrengths, errors: e.cognitiveErrorAnalysis })))}
-Coach Strengths: ${JSON.stringify(coachResult.feedback.observedStrengths)}
-Coach Areas: ${JSON.stringify(coachResult.feedback.areasToImprove)}
+  let synthesis: OrchestratorSynthesis | undefined = checkpoint.synthesis;
+  if (!synthesis) {
+    emitLog('orchestrator', 'Orchestrator Agent', 'action', 'Synthesizing the validated agent results into a report.');
+    const synthesisPrompt = `Student Name: ${studentName}
+Overall Cognitive Score: ${analysis.overallScore}
+Answered Items: ${answeredCount} of ${analysis.evaluations.length}
+Category Scores: ${JSON.stringify(analysis.categoryScores)}
+Analyzer Evaluations: ${JSON.stringify(analysis.evaluations.map(e => ({ q: e.categoryTitle, score: e.score, strengths: e.demonstratedStrengths, errors: e.cognitiveErrorAnalysis })))}
+Coach Strengths: ${JSON.stringify(feedback.observedStrengths)}
+Coach Areas: ${JSON.stringify(feedback.areasToImprove)}
 
 Do not treat unanswered items as incorrect or infer performance where there is no submitted evidence.
 
@@ -131,30 +175,45 @@ Synthesize these results into a final cognitive profile. Return valid JSON stric
   "keyTakeaway": "Single high-impact recommendation for student/educator."
 }`;
 
-  const fallbackSynthesis = answeredCount === 0
-    ? {
+    const fallbackSynthesis = answeredCount === 0
+      ? {
         executiveSummary: `${studentName} did not submit responses, so there is insufficient evidence to describe cognitive performance.`,
         cognitiveProfileType: 'Insufficient evidence',
         keyTakeaway: 'Complete the assessment items to receive evidence-based feedback.',
       }
-    : {
-    executiveSummary: `${studentName} demonstrated solid cognitive capabilities across the assessment, with particular strength in ${analyzerResult.analysis.categoryScores.logicalReasoning >= analyzerResult.analysis.categoryScores.patternRecognition ? 'logical deduction' : 'pattern recognition'}. Their reasoning is structured and responds well to concrete problem framing.`,
-    cognitiveProfileType: analyzerResult.analysis.overallScore >= 85 ? 'Strategic Analytical Thinker' : 'Intuitive Adaptive Problem Solver',
-    keyTakeaway: 'Focus on writing out intermediate logic steps to prevent minor heuristic oversights during complex multi-stage problems.'
-    };
+      : {
+          executiveSummary: `${studentName} demonstrated solid cognitive capabilities across the assessment, with particular strength in ${analysis.categoryScores.logicalReasoning >= analysis.categoryScores.patternRecognition ? 'logical deduction' : 'pattern recognition'}. Their reasoning is structured and responds well to concrete problem framing.`,
+          cognitiveProfileType: analysis.overallScore >= 85 ? 'Strategic Analytical Thinker' : 'Intuitive Adaptive Problem Solver',
+          keyTakeaway: 'Focus on writing out intermediate logic steps to prevent minor heuristic oversights during complex multi-stage problems.',
+        };
 
-  let synthesis = fallbackSynthesis;
-  if (getGroqClient() && answeredCount > 0) {
-    const rawSynthesis = await callGroqChat({
-      messages: [
-        { role: 'system', content: ORCHESTRATOR_SYSTEM_PROMPT },
-        { role: 'user', content: synthesisPrompt },
-      ],
-      temperature: 0.3,
-    });
-    synthesis = validateOrchestratorSynthesis(extractJSONFromLLMResponse<unknown>(rawSynthesis));
+    synthesis = fallbackSynthesis;
+    if (getGroqClient() && answeredCount > 0) {
+      const rawSynthesis = await callGroqChat({
+        messages: [
+          { role: 'system', content: ORCHESTRATOR_SYSTEM_PROMPT },
+          { role: 'user', content: synthesisPrompt },
+        ],
+        temperature: 0.3,
+      });
+      synthesis = validateOrchestratorSynthesis(extractJSONFromLLMResponse<unknown>(rawSynthesis));
+    }
+    const nextCheckpoint: AssessmentPipelineCheckpoint = {
+      ...checkpoint,
+      nextStage: 'save_report',
+      analysis,
+      feedback,
+      synthesis,
+    };
+    if (await onCheckpoint?.(nextCheckpoint)) {
+      return { paused: true, checkpoint: nextCheckpoint };
+    }
+    checkpoint = nextCheckpoint;
   }
 
+  if (!analysis || !feedback || !synthesis) {
+    throw new Error('Assessment pipeline checkpoint is missing completed agent output.');
+  }
   emitLog('orchestrator', 'Orchestrator Agent', 'success', 'Assessment pipeline completed.');
 
   const finalReport: FinalAssessmentReport = {
@@ -162,21 +221,21 @@ Synthesize these results into a final cognitive profile. Return valid JSON stric
     assessmentId: assessmentId ?? `cog-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
     timestamp: new Date().toISOString(),
     mode: getGroqClient() ? 'groq' : 'demo',
-    overallScore: analyzerResult.analysis.overallScore,
+    overallScore: analysis.overallScore,
     gradeLevel,
     difficulty,
     focusArea,
     questionCount: questions.length,
     targetBloomLevels: [...new Set(questions.map((question) => question.bloomLevel))],
-    categoryScores: analyzerResult.analysis.categoryScores,
-    reasoningClarityScore: analyzerResult.analysis.reasoningClarityScore,
+    categoryScores: analysis.categoryScores,
+    reasoningClarityScore: analysis.reasoningClarityScore,
     designerOutput: {
       questions,
     },
-    analyzerOutput: analyzerResult.analysis,
-    coachOutput: coachResult.feedback,
+    analyzerOutput: analysis,
+    coachOutput: feedback,
     orchestratorSynthesis: synthesis,
   };
 
-  return finalReport;
+  return { paused: false, report: finalReport };
 }

@@ -18,9 +18,12 @@ export default function ProcessingPage() {
     assessmentId,
     assessmentMode,
     assessmentStatus,
+    pauseRequested,
     requestError,
     progressEvents,
     retryAssessment,
+    resumeAssessment,
+    requestAssessmentPause,
     refreshAssessmentStatus,
     setInspectingAgentId,
   } = useAssessment();
@@ -38,12 +41,15 @@ export default function ProcessingPage() {
         assessmentId={assessmentId}
         assessmentMode={assessmentMode}
         assessmentStatus={assessmentStatus}
+        pauseRequested={pauseRequested}
         requestError={requestError}
         progressEvents={progressEvents}
         onInspectAgent={(id) => setInspectingAgentId(id)}
         onViewReport={() => router.push('/report')}
         onBackToSetup={() => router.push('/')}
         onRetry={retryAssessment}
+        onPause={requestAssessmentPause}
+        onResume={resumeAssessment}
         onRefreshStatus={refreshAssessmentStatus}
       />
     </div>

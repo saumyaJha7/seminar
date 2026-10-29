@@ -7,6 +7,7 @@ export type AssessmentLifecycleStatus =
   | 'awaiting_answers'
   | 'evaluating'
   | 'generating_report'
+  | 'paused'
   | 'completed'
   | 'failed';
 export type AssessmentEventStatus = 'waiting' | 'in_progress' | 'completed' | 'failed';
@@ -86,7 +87,16 @@ export interface AssessmentRecord {
   evaluations: QuestionEvaluation[];
   events: AssessmentProgressEvent[];
   report: FinalAssessmentReport | null;
+  pipelineCheckpoint?: AssessmentPipelineCheckpoint;
+  pauseRequested: boolean;
   failureStage?: string;
+}
+
+export interface AssessmentPipelineCheckpoint {
+  nextStage: 'analyzer' | 'coach' | 'synthesis' | 'save_report';
+  analysis?: CognitiveAnalysisResult;
+  feedback?: FeedbackCoachResult;
+  synthesis?: OrchestratorSynthesis;
 }
 
 export interface QuestionEvaluation {

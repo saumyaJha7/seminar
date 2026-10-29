@@ -221,19 +221,19 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* 1. Configuration Strip Card */}
-      <div className="pro-card rounded-2xl p-6 shadow-xs">
+      <section className="pro-card overflow-hidden rounded-2xl border-blue-100 bg-gradient-to-br from-white via-sky-50/70 to-indigo-50/80 p-5 shadow-sm sm:p-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center font-mono">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 font-mono text-xs font-bold text-white shadow-sm shadow-blue-900/20">
                 01
               </span>
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">Assessment Parameters</h2>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">Assessment parameters</h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Set candidate information, cohort complexity, or generate fresh reasoning items.
+              Start with the student and learning goals. The designer agent uses these to shape the question set.
             </p>
           </div>
 
@@ -252,7 +252,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
               questionCount,
               targetBloomLevels,
             })}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white/80 px-4 py-2.5 text-xs font-semibold text-blue-700 shadow-xs transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
           >
             {isGeneratingQuestions ? (
               <>
@@ -269,7 +269,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
         </div>
 
         {/* Inputs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-5">
+        <div className="grid grid-cols-1 gap-4 pt-5 sm:grid-cols-2 lg:grid-cols-3">
           {/* Candidate Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -282,7 +282,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 placeholder="Candidate Full Name"
-                className="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 font-medium transition placeholder:text-slate-400"
+                className="w-full rounded-xl border border-sky-200 bg-white/80 py-2.5 pl-9 pr-3 text-xs font-medium text-slate-900 transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
@@ -297,7 +297,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
               <select
                 value={gradeLevel}
                 onChange={(e) => setGradeLevel(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 font-medium transition cursor-pointer"
+                className="w-full cursor-pointer rounded-xl border border-sky-200 bg-white/80 py-2.5 pl-9 pr-3 text-xs font-medium text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               >
                 <option value="Middle School">Middle School</option>
                 <option value="High School">High School (Standard)</option>
@@ -312,7 +312,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Difficulty Level
             </label>
-            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <div className="flex rounded-xl border border-indigo-100 bg-indigo-100/70 p-1">
               {(['beginner', 'intermediate', 'advanced'] as const).map((diff) => (
                 <button
                   key={diff}
@@ -320,8 +320,8 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                   onClick={() => setDifficulty(diff)}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-lg capitalize transition ${
                     difficulty === diff
-                      ? 'bg-white text-blue-700 font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white font-bold text-indigo-700 shadow-sm'
+                      : 'text-slate-600 hover:text-indigo-800'
                   }`}
                 >
                   {diff}
@@ -339,7 +339,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
               value={focusArea}
               onChange={(event) => setFocusArea(event.target.value)}
               maxLength={200}
-              className="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium transition"
+              className="w-full rounded-xl border border-sky-200 bg-white/80 px-3 py-2.5 text-xs font-medium text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
@@ -352,7 +352,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
               value={questionCount}
               onChange={(event) => setQuestionCount(Number(event.target.value))}
               disabled={isGeneratingQuestions || isEvaluating}
-              className="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium transition cursor-pointer"
+              className="w-full cursor-pointer rounded-xl border border-sky-200 bg-white/80 px-3 py-2.5 text-xs font-medium text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
             >
               {Array.from({ length: MAX_QUESTION_COUNT - MIN_QUESTION_COUNT + 1 }, (_, index) => {
                 const count = MIN_QUESTION_COUNT + index;
@@ -366,7 +366,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
           </div>
         </div>
 
-        <fieldset className="mt-5">
+        <fieldset className="mt-5 rounded-2xl border border-indigo-100/80 bg-white/60 p-4">
           <legend className="block text-xs font-semibold text-slate-700 mb-1.5">Target Bloom Levels</legend>
           <p className="text-[11px] text-slate-500 mb-3">
             Every selected level appears at least once. Scores need two answered items per level; choose 12 questions to target all six levels with two items each.
@@ -380,7 +380,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                 <label
                   key={level}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs capitalize ${
-                    checked ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700'
+                    checked ? 'border-blue-300 bg-blue-50 text-blue-800 shadow-xs' : 'border-slate-200 bg-white/70 text-slate-700'
                   } ${disableAdding ? 'opacity-50' : 'cursor-pointer'}`}
                 >
                   <input
@@ -402,17 +402,17 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
             })}
           </div>
         </fieldset>
-      </div>
+      </section>
 
       {/* 2. Questions & Response Input Card */}
-      <div className="pro-card rounded-2xl p-6 shadow-xs">
+      <section className="pro-card overflow-hidden rounded-2xl border-violet-100 bg-gradient-to-br from-white via-violet-50/40 to-fuchsia-50/50 p-5 shadow-sm sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-5 border-b border-slate-200 gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center font-mono">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 font-mono text-xs font-bold text-white shadow-sm shadow-violet-900/20">
                 02
               </span>
-              <h3 className="text-base font-bold text-slate-900 tracking-tight">Student Responses</h3>
+              <h3 className="text-base font-bold tracking-tight text-slate-900">Student responses</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Input answers and reasoning steps, or choose a quick sample profile.
@@ -455,7 +455,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
             return (
               <div
                 key={q.id}
-                className="bg-slate-50/70 border border-slate-200 rounded-xl p-5 hover:border-slate-300 transition"
+                className="rounded-2xl border border-violet-100 bg-white/80 p-4 shadow-xs transition hover:border-violet-200 hover:shadow-sm sm:p-5"
               >
                 {/* Question header */}
                 <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -499,7 +499,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                         }
                       }}
                       placeholder="Enter student answer... (Ctrl+Enter to run)"
-                      className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl p-3 text-xs text-slate-900 transition resize-none placeholder:text-slate-400"
+                      className="w-full resize-none rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-xs text-slate-900 transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
 
@@ -518,7 +518,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                         }
                       }}
                       placeholder="Explain logic or steps... (Ctrl+Enter to run)"
-                      className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl p-3 text-xs text-slate-900 transition resize-none placeholder:text-slate-400"
+                      className="w-full resize-none rounded-xl border border-violet-200 bg-violet-50/40 p-3 text-xs text-slate-900 transition placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100"
                     />
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                 type="button"
                 onClick={onReset}
                 disabled={isGeneratingQuestions || isEvaluating}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white hover:text-slate-900 disabled:opacity-50"
               >
                 Reset
               </button>
@@ -554,7 +554,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
               <button
                 type="submit"
                 disabled={isGeneratingQuestions || isEvaluating}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition active:scale-[0.98] disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition hover:from-blue-800 hover:to-indigo-800 active:scale-[0.98] disabled:opacity-50"
               >
                 {isEvaluating ? (
                   <>
@@ -571,7 +571,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
             </div>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   );
 };

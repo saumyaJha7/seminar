@@ -88,6 +88,7 @@ Assessment creation is limited to 10 requests per 15 minutes per forwarded clien
 ## 🌟 Key Features
 
 - **Live Agent Pipeline Visualizer**: See nodes pulse and transition states in real time (Standby → Active → Completed).
+- **Checkpointed Pause & Resume**: Pause after the active agent finishes, then resume from the next saved checkpoint without repeating completed agent work.
 - **Inspect Agent Nodes**: Click an agent card to inspect runtime inputs and structured outputs; private prompts and hidden reasoning are not sent to the browser.
 - **Streaming Live Terminal Console**: Watch operational progress events stream over Server-Sent Events (SSE), with lifecycle state persisted for refresh and retry.
 - **One-Click Student Presets**: Test with preset cognitive profiles:

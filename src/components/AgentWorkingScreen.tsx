@@ -15,6 +15,8 @@ import {
   Activity,
   Layers,
   RotateCcw,
+  Pause,
+  Play,
 } from 'lucide-react';
 import {
   AgentId,
@@ -37,12 +39,15 @@ interface AgentWorkingScreenProps {
   assessmentId: string | null;
   assessmentMode: AssessmentMode | null;
   assessmentStatus: AssessmentLifecycleStatus | null;
+  pauseRequested: boolean;
   requestError: string | null;
   progressEvents: AssessmentProgressEvent[];
   onInspectAgent: (agentId: AgentId) => void;
   onViewReport: () => void;
   onBackToSetup: () => void;
   onRetry: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onRefreshStatus: () => Promise<void>;
 }
 
@@ -57,12 +62,15 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   assessmentId,
   assessmentMode,
   assessmentStatus,
+  pauseRequested,
   requestError,
   progressEvents,
   onInspectAgent,
   onViewReport,
   onBackToSetup,
   onRetry,
+  onPause,
+  onResume,
   onRefreshStatus,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -129,12 +137,13 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   const activeAgent = getAgentDetails(activeAgentId);
   const isAllComplete = Boolean(report && assessmentStatus === 'completed' && !isEvaluating);
   const hasFailed = assessmentStatus === 'failed';
+  const isPaused = assessmentStatus === 'paused';
   const flowColors = {
-    sky: { active: 'border-sky-400 bg-sky-50 ring-sky-200', label: 'bg-sky-100 text-sky-800 border-sky-200', text: 'text-sky-700' },
-    slate: { active: 'border-slate-400 bg-slate-50 ring-slate-200', label: 'bg-slate-100 text-slate-800 border-slate-200', text: 'text-slate-700' },
-    blue: { active: 'border-blue-400 bg-blue-50 ring-blue-200', label: 'bg-blue-100 text-blue-800 border-blue-200', text: 'text-blue-700' },
-    amber: { active: 'border-amber-400 bg-amber-50 ring-amber-200', label: 'bg-amber-100 text-amber-800 border-amber-200', text: 'text-amber-700' },
-    indigo: { active: 'border-indigo-400 bg-indigo-50 ring-indigo-200', label: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'text-indigo-700' },
+    sky: { active: 'border-sky-400 bg-sky-50 ring-sky-200', label: 'bg-sky-100 text-sky-800 border-sky-200', text: 'text-sky-700', tint: 'from-sky-50 to-white' },
+    slate: { active: 'border-slate-400 bg-slate-50 ring-slate-200', label: 'bg-slate-100 text-slate-800 border-slate-200', text: 'text-slate-700', tint: 'from-slate-50 to-white' },
+    blue: { active: 'border-blue-400 bg-blue-50 ring-blue-200', label: 'bg-blue-100 text-blue-800 border-blue-200', text: 'text-blue-700', tint: 'from-blue-50 to-white' },
+    amber: { active: 'border-amber-400 bg-amber-50 ring-amber-200', label: 'bg-amber-100 text-amber-800 border-amber-200', text: 'text-amber-700', tint: 'from-amber-50 to-white' },
+    indigo: { active: 'border-indigo-400 bg-indigo-50 ring-indigo-200', label: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'text-indigo-700', tint: 'from-indigo-50 to-white' },
   } as const;
   const synthesisStarted = logs.some(
     (log) =>
@@ -155,7 +164,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   }> = [
     {
       id: 'designer' as const,
-      label: 'Agent 1 · Designer',
+      label: 'Designer',
       title: 'Create question set',
       input: 'Grade, focus area, difficulty & Bloom targets',
       process: 'Builds calibrated questions, expected answers and rubrics.',
@@ -177,7 +186,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
     },
     {
       id: 'analyzer' as const,
-      label: 'Agent 2 · Analyzer',
+      label: 'Analyzer',
       title: 'Evaluate evidence',
       input: 'Questions, rubrics, answers & reasoning',
       process: 'Scores each response and checks evidence against its rubric.',
@@ -188,7 +197,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
     },
     {
       id: 'coach' as const,
-      label: 'Agent 3 · Coach',
+      label: 'Coach',
       title: 'Build practice plan',
       input: 'Validated scores, strengths & gaps',
       process: 'Turns findings into constructive feedback and targeted practice.',
@@ -215,6 +224,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
             : 'waiting' as const,
     },
   ];
+  const completedRouteNodes = flowSteps.filter((step) => step.status === 'completed').length;
+  const routeProgress = Math.round((completedRouteNodes / flowSteps.length) * 100);
   const latestActiveEvent = [...progressEvents].reverse().find(
     (event) => event.status === 'in_progress' && ['evaluation', 'report'].includes(event.stage),
   );
@@ -229,6 +240,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
     awaiting_answers: 'Awaiting answers',
     evaluating: 'Evaluating responses',
     generating_report: 'Building report',
+    paused: 'Paused',
     completed: 'Completed',
     failed: 'Failed',
   };
@@ -243,6 +255,62 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
 
   return (
     <div className="space-y-6">
+      <section className="pipeline-route-banner relative isolate overflow-hidden rounded-3xl border border-indigo-950/20 px-5 py-6 text-white shadow-xl shadow-indigo-950/10 sm:px-7 sm:py-7">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full bg-cyan-300/15 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-violet-400/15 blur-3xl" />
+        <div className="relative grid gap-6 lg:grid-cols-[1fr_18rem] lg:items-end">
+          <div>
+            <p className="mb-2 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100">
+              <span className={`h-2 w-2 rounded-full ${isEvaluating ? 'animate-pulse bg-emerald-300' : 'bg-slate-300'}`} />
+              Multi-agent execution route
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Follow every handoff.</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-indigo-100/90">
+              The Orchestrator coordinates specialist agents from question design through evidence analysis and coaching, with each output passed into the next stage.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-indigo-50">
+                Candidate · {studentName || 'Student'}
+              </span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-indigo-50">
+                {providerLabel}
+              </span>
+              {assessmentId && (
+                <span className="max-w-full truncate rounded-full border border-white/15 bg-white/10 px-3 py-1 font-mono text-xs text-indigo-100 sm:max-w-64">
+                  Run · {assessmentId}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/15 bg-slate-950/25 p-4 backdrop-blur-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-indigo-100">Route progress</span>
+              <span className="text-sm font-bold tabular-nums text-white">{completedRouteNodes}/{flowSteps.length} nodes</span>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-white/15"
+              role="progressbar"
+              aria-label="Completed route nodes"
+              aria-valuemin={0}
+              aria-valuemax={flowSteps.length}
+              aria-valuenow={completedRouteNodes}
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300 transition-[width] duration-500 motion-reduce:transition-none"
+                style={{ width: `${routeProgress}%` }}
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+              <span className="text-indigo-100/80">3 specialist agents · 1 orchestrator</span>
+              <span className="font-semibold text-white">
+                {isAllComplete ? 'Complete' : isPaused ? 'Paused' : hasFailed ? 'Needs attention' : 'Handoffs tracked'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 1. Active Agent Spotlight Hero Card */}
       <div
         className={`pro-card rounded-2xl p-6 sm:p-8 transition-all duration-300 motion-reduce:transition-none shadow-sm ${
@@ -255,7 +323,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           <div className="flex items-start sm:items-center gap-5">
             {/* Active Avatar Icon */}
             <div className="relative shrink-0">
-              <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+              <div key={activeAgentId} className="animate-agent-switch flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
                 {isAllComplete ? (
                   <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                 ) : (
@@ -291,21 +359,27 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                 )}
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                {isAllComplete
-                  ? 'All 4 Agents Completed Execution!'
-                  : hasFailed
-                    ? 'Assessment could not be completed'
-                    : `${activeAgent.name} is working...`}
-              </h2>
+              <div key={`${activeAgentId}-${assessmentStatus}`} className="animate-agent-switch">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                  {isAllComplete
+                    ? 'All 4 Agents Completed Execution!'
+                    : hasFailed
+                      ? 'Assessment could not be completed'
+                      : isPaused
+                        ? 'Assessment paused safely'
+                        : `${activeAgent.name} is working...`}
+                </h2>
 
-              <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-xl leading-relaxed">
-                {isAllComplete
-                  ? 'Orchestrator synthesized all dimensional analytics into the final Cognitive Assessment Report.'
-                  : hasFailed
-                    ? requestError || 'Your saved answers are available for a safe retry.'
-                    : agentActivities[activeAgentId] || activeAgent.roleDesc}
-              </p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-600 sm:text-sm">
+                  {isAllComplete
+                    ? 'Orchestrator synthesized all dimensional analytics into the final Cognitive Assessment Report.'
+                    : hasFailed
+                      ? requestError || 'Your saved answers are available for a safe retry.'
+                      : isPaused
+                        ? 'Completed agent outputs are saved. Resume to continue with the next agent without repeating completed work.'
+                        : agentActivities[activeAgentId] || activeAgent.roleDesc}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -341,6 +415,15 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                 <span>View Full Cognitive Report</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+            ) : isPaused ? (
+              <button
+                type="button"
+                onClick={onResume}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Resume from checkpoint
+              </button>
             ) : hasFailed ? (
               <button
                 onClick={onRetry}
@@ -350,9 +433,25 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                 Retry saved assessment
               </button>
             ) : (
-              <div className="flex items-center gap-2 text-xs font-medium text-blue-700">
-                <Activity className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none text-blue-600" />
-                <span>Running multi-agent inference...</span>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                {pauseRequested ? (
+                  <p role="status" className="text-xs font-medium text-amber-700">
+                    Finishing the active agent before pausing…
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onPause}
+                    className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
+                  >
+                    <Pause className="h-3.5 w-3.5" />
+                    Pause after this agent
+                  </button>
+                )}
+                <div className="flex items-center gap-2 text-xs font-medium text-blue-700">
+                  <Activity className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none text-blue-600" />
+                  <span>{pauseRequested ? 'Execution will stop at the next checkpoint.' : 'Running multi-agent inference...'}</span>
+                </div>
               </div>
             )}
           </div>
@@ -410,16 +509,22 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
       </section>
 
       {/* 2. Sequential Agent Pipeline Cards */}
-      <div className="pro-card rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-blue-600" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Multi-Agent Orchestration Sequence
-            </h3>
+      <section className="pipeline-sequence-panel pro-card rounded-2xl p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex flex-col gap-3 border-b border-indigo-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                <Layers className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Agent-to-agent handoff map</h3>
+                <p className="mt-0.5 text-xs text-slate-600">See what each stage receives, does, and passes forward.</p>
+              </div>
+            </div>
           </div>
-          <span className="text-xs text-slate-500 hidden sm:inline">
-            Click any agent to inspect prompts & JSON outputs
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1.5 text-xs font-semibold text-indigo-800">
+            <span className="h-2 w-2 rounded-full bg-indigo-500" />
+            {flowSteps.length} linked stages
           </span>
         </div>
 
@@ -443,25 +548,30 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
             const colors = flowColors[step.color];
             const card = (
               <div
-                className={`h-full rounded-xl border p-3 ${
+                className={`h-full rounded-2xl border bg-gradient-to-br p-3.5 transition-all duration-300 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${
                   isRunning
-                    ? `${colors.active} ring-2`
+                    ? `${colors.active} ring-2 shadow-md agent-stage-enter`
                     : isCompleted
-                      ? 'border-slate-300 bg-slate-50/80'
-                      : 'border-slate-200 bg-white'
+                      ? 'border-emerald-200 from-emerald-50/80 to-white shadow-xs'
+                      : `border-slate-200 ${colors.tint}`
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${colors.label}`}>
-                    {step.label}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-[10px] font-bold ${colors.label}`}>
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span className={`truncate rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${colors.label}`}>
+                      {step.label}
+                    </span>
+                  </div>
                   <span className={`shrink-0 text-[11px] font-semibold ${
                     isRunning ? colors.text : isCompleted ? 'text-emerald-700' : step.status === 'error' ? 'text-rose-700' : 'text-slate-400'
                   }`}>
                     {statusLabel}
                   </span>
                 </div>
-                <h4 className="text-xs font-bold text-slate-900">{step.title}</h4>
+                <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
                 <dl className="mt-3 space-y-2 text-[11px] leading-snug">
                   <div>
                     <dt className="font-semibold uppercase tracking-wide text-slate-400">Input</dt>
@@ -471,8 +581,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                     <dt className="font-semibold uppercase tracking-wide text-slate-400">Work</dt>
                     <dd className="mt-0.5 text-slate-600">{step.process}</dd>
                   </div>
-                  <div className="border-t border-slate-200 pt-2">
-                    <dt className="font-semibold uppercase tracking-wide text-slate-400">Output → {step.destination}</dt>
+                  <div className="rounded-xl border border-white/80 bg-white/75 p-2.5">
+                    <dt className="font-semibold uppercase tracking-wide text-slate-500">Output → {step.destination}</dt>
                     <dd className="mt-0.5 font-medium text-slate-800">{step.output}</dd>
                   </div>
                 </dl>
@@ -506,7 +616,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
             );
           })}
         </div>
-      </div>
+      </section>
 
       {/* 3. Live Thought Console Stream */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden text-xs">

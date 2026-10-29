@@ -52,6 +52,41 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
     hasCategoryAnswers(category) ? `${score}%` : 'N/A';
   const categoryScoreBadge = (category: QuestionCategory, score: number) =>
     !hasCategoryAnswers(category) ? 'Not assessed' : score >= 85 ? 'Exemplary' : 'Developing';
+  const categoryResults = [
+    {
+      label: 'Logical deduction',
+      score: report.categoryScores.logicalReasoning,
+      category: 'logical_reasoning' as const,
+      color: 'bg-blue-600',
+    },
+    {
+      label: 'Pattern recognition',
+      score: report.categoryScores.patternRecognition,
+      category: 'pattern_recognition' as const,
+      color: 'bg-indigo-600',
+    },
+    {
+      label: 'Problem solving',
+      score: report.categoryScores.problemSolving,
+      category: 'problem_solving' as const,
+      color: 'bg-amber-500',
+    },
+  ];
+  const outcomeResults = [
+    { key: 'correct', label: 'Correct', color: '#059669' },
+    { key: 'partially_correct', label: 'Partially correct', color: '#d97706' },
+    { key: 'incorrect', label: 'Incorrect', color: '#e11d48' },
+    { key: 'uncertain', label: 'Uncertain', color: '#64748b' },
+    { key: 'unanswered', label: 'Unanswered', color: '#cbd5e1' },
+  ].map((outcome) => ({
+    ...outcome,
+    count: report.analyzerOutput.evaluations.filter(
+      (evaluation) => evaluation.answerCorrectness === outcome.key,
+    ).length,
+  }));
+  const outcomeTotal = outcomeResults.reduce((total, outcome) => total + outcome.count, 0);
+  const chartCircumference = 2 * Math.PI * 44;
+  let chartOffset = 0;
   const getVerdictBadge = (isCorrect: boolean | 'partial' | 'uncertain' | 'unanswered') => {
     if (isCorrect === true) {
       return (
@@ -384,6 +419,13 @@ ${i + 1}. **${p.title}**
       {/* TAB 1: EXECUTIVE OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="space-y-6 animate-in fade-in duration-200 motion-reduce:animate-none motion-reduce:transition-none">
+          <div className="flex flex-col gap-1 border-l-4 border-blue-600 pl-4">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Assessment results</h2>
+            <p className="text-sm text-slate-600">
+              A visual summary of performance across the submitted assessment responses.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Orchestrator Executive Synthesis Card */}
             <div className="lg:col-span-2 pro-card rounded-2xl p-6 shadow-xs">
@@ -511,6 +553,127 @@ ${i + 1}. **${p.title}**
             </div>
 
           </div>
+
+          <section aria-label="Assessment result charts" className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <article className="pro-card rounded-2xl p-5 shadow-xs sm:p-6">
+              <div className="mb-6">
+                <h3 className="text-base font-bold text-slate-900">Performance by category</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Rubric scores for categories with submitted answers.
+                </p>
+              </div>
+              <div role="img" aria-label="Horizontal bar chart showing scores by reasoning category">
+                <div className="space-y-5">
+                  {categoryResults.map((result) => {
+                    const categoryResponses = answeredEvaluations.filter(
+                      (evaluation) => evaluation.category === result.category,
+                    ).length;
+                    const assessed = categoryResponses > 0;
+                    return (
+                      <div key={result.category}>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{result.label}</p>
+                            <p className="text-xs text-slate-500">
+                              {categoryResponses} answered {categoryResponses === 1 ? 'question' : 'questions'}
+                            </p>
+                          </div>
+                          <span className="text-lg font-bold tabular-nums text-slate-900">
+                            {assessed ? `${Math.round(result.score)}%` : 'N/A'}
+                          </span>
+                        </div>
+                        <div
+                          className="relative h-3 overflow-hidden rounded-full bg-slate-100"
+                          aria-hidden="true"
+                        >
+                          <div className="absolute inset-0 grid grid-cols-4 divide-x divide-white/90">
+                            <span /><span /><span /><span />
+                          </div>
+                          <div
+                            className={`relative h-full rounded-full ${result.color} transition-[width] duration-700 motion-reduce:transition-none`}
+                            style={{ width: `${assessed ? Math.min(100, Math.max(0, result.score)) : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="ml-[1px] mt-2 flex justify-between text-[11px] font-medium text-slate-500">
+                  <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                </div>
+              </div>
+            </article>
+
+            <article className="pro-card rounded-2xl p-5 shadow-xs sm:p-6">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-slate-900">Answer outcomes</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Distribution of evaluated questions, including unanswered items.
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-8">
+                <div
+                  className="relative h-44 w-44 shrink-0"
+                  role="img"
+                  aria-label={outcomeTotal > 0
+                    ? `Donut chart showing outcomes for ${outcomeTotal} questions`
+                    : 'No question outcomes are available to chart'}
+                >
+                  <svg viewBox="0 0 112 112" className="h-full w-full -rotate-90" aria-hidden="true">
+                    <circle cx="56" cy="56" r="44" fill="none" stroke="#f1f5f9" strokeWidth="12" />
+                    {outcomeResults.map((outcome) => {
+                      const segmentLength = outcomeTotal > 0
+                        ? (outcome.count / outcomeTotal) * chartCircumference
+                        : 0;
+                      const segment = (
+                        <circle
+                          key={outcome.key}
+                          cx="56"
+                          cy="56"
+                          r="44"
+                          fill="none"
+                          stroke={outcome.color}
+                          strokeWidth="12"
+                          strokeDasharray={`${segmentLength} ${chartCircumference - segmentLength}`}
+                          strokeDashoffset={-chartOffset}
+                          strokeLinecap="butt"
+                        />
+                      );
+                      chartOffset += segmentLength;
+                      return segment;
+                    })}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    {outcomeTotal > 0 ? (
+                      <>
+                        <span className="text-3xl font-bold tabular-nums text-slate-900">{outcomeTotal}</span>
+                        <span className="text-xs font-medium text-slate-500">questions</span>
+                      </>
+                    ) : (
+                      <span className="max-w-20 text-center text-xs font-semibold text-slate-500">
+                        No outcomes yet
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <ul className="w-full space-y-3 sm:max-w-xs" aria-label="Answer outcome legend">
+                  {outcomeResults.map((outcome) => (
+                    <li key={outcome.key} className="flex items-center justify-between gap-4 text-sm">
+                      <span className="flex items-center gap-2.5 text-slate-700">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-sm"
+                          style={{ backgroundColor: outcome.color }}
+                          aria-hidden="true"
+                        />
+                        {outcome.label}
+                      </span>
+                      <span className="font-semibold tabular-nums text-slate-900">{outcome.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          </section>
         </div>
       )}
 

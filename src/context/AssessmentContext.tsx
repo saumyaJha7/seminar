@@ -37,6 +37,7 @@ interface AssessmentContextType {
   assessmentId: string | null;
   assessmentMode: AssessmentMode | null;
   assessmentStatus: AssessmentLifecycleStatus | null;
+  pauseRequested: boolean;
   requestError: string | null;
   progressEvents: AssessmentProgressEvent[];
   isEvaluating: boolean;
@@ -69,6 +70,8 @@ interface AssessmentContextType {
     studentAnswers: StudentAnswer[];
   }) => Promise<void>;
   retryAssessment: () => Promise<void>;
+  resumeAssessment: () => Promise<void>;
+  requestAssessmentPause: () => Promise<void>;
   resetAssessment: () => Promise<void>;
   refreshAssessmentStatus: () => Promise<void>;
   inspectingAgentId: AgentId | null;
@@ -83,6 +86,7 @@ interface AssessmentContextType {
 interface AssessmentSnapshot {
   id: string;
   status: AssessmentLifecycleStatus;
+  pauseRequested: boolean;
   mode: AssessmentMode;
   studentName: string;
   gradeLevel: string;
@@ -144,6 +148,7 @@ function isLifecycleStatus(value: unknown): value is AssessmentLifecycleStatus {
     'awaiting_answers',
     'evaluating',
     'generating_report',
+    'paused',
     'completed',
     'failed',
   ].includes(String(value));
@@ -163,6 +168,7 @@ function isAssessmentSnapshot(value: unknown): value is AssessmentSnapshot {
     (value.difficulty === 'beginner' || value.difficulty === 'intermediate' || value.difficulty === 'advanced') &&
     typeof value.focusArea === 'string' &&
     typeof value.questionCount === 'number' &&
+    typeof value.pauseRequested === 'boolean' &&
     parseQuestionGenerationConfig(value.questionCount, value.targetBloomLevels) !== null &&
     Array.isArray(value.questions) &&
     Array.isArray(value.events)
@@ -184,6 +190,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [assessmentMode, setAssessmentMode] = useState<AssessmentMode | null>(null);
   const [assessmentStatus, setAssessmentStatus] = useState<AssessmentLifecycleStatus | null>(null);
+  const [pauseRequested, setPauseRequested] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [progressEvents, setProgressEvents] = useState<AssessmentProgressEvent[]>([]);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -248,6 +255,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAssessmentId(snapshot.id);
     setAssessmentMode(snapshot.mode);
     setAssessmentStatus(snapshot.status);
+    setPauseRequested(snapshot.pauseRequested);
     setProgressEvents(snapshot.events);
     setStudentName(
       typeof savedDetails.studentName === 'string' &&
@@ -429,7 +437,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (assessmentStatus === 'completed' && pathname === '/processing') {
       router.replace('/report');
     } else if (
-      ['queued', 'evaluating', 'generating_report'].includes(assessmentStatus ?? '') &&
+      ['queued', 'evaluating', 'generating_report', 'paused'].includes(assessmentStatus ?? '') &&
       pathname !== '/processing'
     ) {
       router.replace('/processing');
@@ -552,6 +560,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }) => {
     if (isEvaluating) return;
     setRequestError(null);
+    const isResumingCheckpoint = assessmentStatus === 'paused' || assessmentStatus === 'failed';
     setStudentName(params.studentName);
     setGradeLevel(params.gradeLevel);
     setDifficulty(params.difficulty);
@@ -559,7 +568,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setQuestionCount(params.questionCount);
     setTargetBloomLevels(params.targetBloomLevels);
     setReport(null);
-    setLogs([]);
+    if (!isResumingCheckpoint) setLogs([]);
+    setPauseRequested(false);
 
     try {
       let id = assessmentId;
@@ -612,15 +622,23 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       if (!id) throw new Error('The assessment could not be assigned an ID.');
       setAssessmentId(id);
-      setAssessmentStatus(status);
+      setAssessmentStatus(status === 'paused' ? 'evaluating' : status);
       localStorage.setItem(ACTIVE_ASSESSMENT_KEY, id);
       setIsEvaluating(true);
-      setAgentStatuses({ ...defaultStatuses, orchestrator: 'running', designer: 'completed' });
-      setAgentActivities({
-        ...defaultActivities,
-        orchestrator: 'Assessment ID created; response evaluation is starting.',
-        designer: 'Validated questions saved',
-      });
+      setAgentStatuses((previous) =>
+        isResumingCheckpoint
+          ? { ...previous, orchestrator: 'running' }
+          : { ...defaultStatuses, orchestrator: 'running', designer: 'completed' },
+      );
+      setAgentActivities((previous) =>
+        isResumingCheckpoint
+          ? { ...previous, orchestrator: 'Resuming from the last saved agent checkpoint.' }
+          : {
+              ...defaultActivities,
+              orchestrator: 'Assessment ID created; response evaluation is starting.',
+              designer: 'Validated questions saved',
+            },
+      );
 
       const response = await fetch('/api/assessment/stream', {
         method: 'POST',
@@ -641,6 +659,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       let buffer = '';
       let completed = false;
       let failed = false;
+      let paused = false;
 
       const handleEvent = (rawEvent: string) => {
         const lines = rawEvent.split('\n');
@@ -667,6 +686,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           completed = true;
           setReport(finalReport);
           setAssessmentStatus('completed');
+          setPauseRequested(false);
           setAssessmentMode(finalReport.mode);
           localStorage.setItem('latest_cognitive_report', JSON.stringify(finalReport));
           localStorage.removeItem(`assessment_answers_${id}`);
@@ -701,6 +721,26 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             },
             coach: { input: finalReport.analyzerOutput, output: finalReport.coachOutput },
           });
+        } else if (eventName === 'paused') {
+          paused = true;
+          setAssessmentStatus('paused');
+          setPauseRequested(false);
+          setIsEvaluating(false);
+          setProgressEvents((previous) => [
+            ...previous,
+            {
+              id: `pause-${id}-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              stage: 'pause',
+              status: 'completed',
+              message: 'Execution paused safely. Resume to continue from the next agent checkpoint.',
+            },
+          ]);
+          setAgentStatuses((previous) => ({ ...previous, orchestrator: 'waiting' }));
+          setAgentActivities((previous) => ({
+            ...previous,
+            orchestrator: 'Execution paused safely. Resume to continue from the next agent.',
+          }));
         } else if (eventName === 'error' && isRecord(data)) {
           failed = true;
           setAssessmentStatus('failed');
@@ -719,7 +759,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       buffer += decoder.decode();
       if (buffer.trim()) handleEvent(buffer);
-      if (!completed && !failed) {
+      if (!completed && !failed && !paused) {
         await loadAssessmentSnapshot(id);
       }
     } catch (error) {
@@ -754,6 +794,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAssessmentId(null);
     setAssessmentMode(null);
     setAssessmentStatus(null);
+    setPauseRequested(false);
     setRequestError(null);
     setProgressEvents([]);
     setIsEvaluating(false);
@@ -789,6 +830,47 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   };
 
+  const resumeAssessment = async () => {
+    if (!assessmentId || assessmentStatus !== 'paused') return;
+    await startAssessment({
+      studentName,
+      gradeLevel,
+      difficulty,
+      focusArea,
+      questionCount,
+      targetBloomLevels,
+      questions,
+      studentAnswers: [],
+    });
+  };
+
+  const requestAssessmentPause = async () => {
+    if (!assessmentId || !isEvaluating || pauseRequested) return;
+    setRequestError(null);
+    try {
+      const response = await fetch(
+        `/api/assessments/${encodeURIComponent(assessmentId)}/pause`,
+        { method: 'POST' },
+      );
+      const payload: unknown = await response.json();
+      if (!response.ok || !isRecord(payload) || typeof payload.status !== 'string') {
+        throw new Error(
+          isRecord(payload) && typeof payload.error === 'string'
+            ? payload.error
+            : 'Unable to pause the assessment.',
+        );
+      }
+      if (payload.status === 'paused') {
+        setAssessmentStatus('paused');
+        setIsEvaluating(false);
+      } else {
+        setPauseRequested(true);
+      }
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Unable to pause the assessment.');
+    }
+  };
+
   const loadReportFromHistory = (id: string) => {
     const item = history.find((entry) => entry.assessmentId === id);
     if (item) {
@@ -820,6 +902,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         assessmentId,
         assessmentMode,
         assessmentStatus,
+        pauseRequested,
         requestError,
         progressEvents,
         isEvaluating,
@@ -837,6 +920,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         generateQuestions,
         startAssessment,
         retryAssessment,
+        resumeAssessment,
+        requestAssessmentPause,
         resetAssessment,
         refreshAssessmentStatus,
         inspectingAgentId,

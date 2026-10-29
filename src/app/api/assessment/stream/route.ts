@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { runFullAssessmentPipeline } from '@/lib/agents/orchestrator';
+import { runAssessmentPipeline } from '@/lib/agents/orchestrator';
 import {
   appendAssessmentEvent,
   getAssessment,
+  saveAssessmentCheckpoint,
   saveAssessmentReport,
   updateAssessmentStatus,
 } from '@/lib/assessment-store';
-import { AgentLogEntry, AgentStatus } from '@/types/assessment';
+import { AgentLogEntry, AgentStatus, AssessmentLifecycleStatus } from '@/types/assessment';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -45,6 +46,9 @@ export async function POST(request: Request) {
   if (assessment.status === 'failed') {
     updateAssessmentStatus(assessment.id, 'queued', 'retry', 'A retry was requested; saved answers will be evaluated again.');
     assessment = getAssessment(assessment.id);
+  } else if (assessment.status === 'paused') {
+    updateAssessmentStatus(assessment.id, 'queued', 'resume', 'Resuming from the last saved agent checkpoint.');
+    assessment = getAssessment(assessment.id);
   }
 
   if (!assessment || assessment.status !== 'queued') {
@@ -54,7 +58,19 @@ export async function POST(request: Request) {
     );
   }
 
-  updateAssessmentStatus(assessment.id, 'evaluating', 'evaluation', 'Saved responses are being evaluated against their rubrics.');
+  const checkpoint = assessment.pipelineCheckpoint ?? { nextStage: 'analyzer' as const };
+  const initialStatus: AssessmentLifecycleStatus =
+    checkpoint.nextStage === 'synthesis' || checkpoint.nextStage === 'save_report'
+      ? 'generating_report'
+      : 'evaluating';
+  updateAssessmentStatus(
+    assessment.id,
+    initialStatus,
+    initialStatus === 'generating_report' ? 'report' : 'evaluation',
+    initialStatus === 'generating_report'
+      ? 'Resuming report synthesis from the saved agent outputs.'
+      : 'Saved responses are being evaluated against their rubrics.',
+  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -73,7 +89,7 @@ export async function POST(request: Request) {
       });
 
       try {
-        const finalReport = await runFullAssessmentPipeline({
+        const result = await runAssessmentPipeline({
           studentName: assessment.studentName,
           gradeLevel: assessment.gradeLevel,
           difficulty: assessment.difficulty,
@@ -81,6 +97,14 @@ export async function POST(request: Request) {
           preExistingQuestions: assessment.questions,
           studentAnswers: assessment.answers,
           assessmentId: assessment.id,
+          checkpoint,
+          onCheckpoint: async (nextCheckpoint) => {
+            const paused = saveAssessmentCheckpoint(assessment.id, nextCheckpoint);
+            if (paused) {
+              sendEvent('paused', { status: 'paused', nextStage: nextCheckpoint.nextStage });
+            }
+            return paused;
+          },
           onLog: (entry: AgentLogEntry) => {
             if (
               entry.agentId === 'orchestrator' &&
@@ -111,6 +135,9 @@ export async function POST(request: Request) {
           },
         });
 
+        if (result.paused) return;
+
+        const finalReport = result.report;
         const latest = getAssessment(assessment.id);
         if (latest?.status === 'evaluating') {
           updateAssessmentStatus(
@@ -126,7 +153,7 @@ export async function POST(request: Request) {
         sendEvent('complete', finalReport);
       } catch {
         const latest = getAssessment(assessment.id);
-        if (latest && latest.status !== 'completed' && latest.status !== 'failed') {
+        if (latest && latest.status !== 'completed' && latest.status !== 'failed' && latest.status !== 'paused') {
           updateAssessmentStatus(
             assessment.id,
             'failed',
