@@ -129,6 +129,92 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   const activeAgent = getAgentDetails(activeAgentId);
   const isAllComplete = Boolean(report && assessmentStatus === 'completed' && !isEvaluating);
   const hasFailed = assessmentStatus === 'failed';
+  const flowColors = {
+    sky: { active: 'border-sky-400 bg-sky-50 ring-sky-200', label: 'bg-sky-100 text-sky-800 border-sky-200', text: 'text-sky-700' },
+    slate: { active: 'border-slate-400 bg-slate-50 ring-slate-200', label: 'bg-slate-100 text-slate-800 border-slate-200', text: 'text-slate-700' },
+    blue: { active: 'border-blue-400 bg-blue-50 ring-blue-200', label: 'bg-blue-100 text-blue-800 border-blue-200', text: 'text-blue-700' },
+    amber: { active: 'border-amber-400 bg-amber-50 ring-amber-200', label: 'bg-amber-100 text-amber-800 border-amber-200', text: 'text-amber-700' },
+    indigo: { active: 'border-indigo-400 bg-indigo-50 ring-indigo-200', label: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'text-indigo-700' },
+  } as const;
+  const synthesisStarted = logs.some(
+    (log) =>
+      log.agentId === 'orchestrator' &&
+      log.level === 'action' &&
+      log.message.startsWith('Synthesizing'),
+  );
+  const flowSteps: Array<{
+    id: AgentId | null;
+    label: string;
+    title: string;
+    input: string;
+    process: string;
+    output: string;
+    destination: string;
+    color: keyof typeof flowColors;
+    status: AgentStatus;
+  }> = [
+    {
+      id: 'designer' as const,
+      label: 'Agent 1 · Designer',
+      title: 'Create question set',
+      input: 'Grade, focus area, difficulty & Bloom targets',
+      process: 'Builds calibrated questions, expected answers and rubrics.',
+      output: 'Questions + scoring rubrics',
+      destination: 'Student',
+      color: 'sky',
+      status: agentStatuses.designer,
+    },
+    {
+      id: null,
+      label: 'Student',
+      title: 'Submit responses',
+      input: 'Questions + scoring rubrics',
+      process: 'Student answers each question and can explain their reasoning.',
+      output: 'Answers + reasoning',
+      destination: 'Analyzer',
+      color: 'slate',
+      status: 'completed' as const,
+    },
+    {
+      id: 'analyzer' as const,
+      label: 'Agent 2 · Analyzer',
+      title: 'Evaluate evidence',
+      input: 'Questions, rubrics, answers & reasoning',
+      process: 'Scores each response and checks evidence against its rubric.',
+      output: 'Scores + evidence + growth areas',
+      destination: 'Coach + Orchestrator',
+      color: 'blue',
+      status: agentStatuses.analyzer,
+    },
+    {
+      id: 'coach' as const,
+      label: 'Agent 3 · Coach',
+      title: 'Build practice plan',
+      input: 'Validated scores, strengths & gaps',
+      process: 'Turns findings into constructive feedback and targeted practice.',
+      output: 'Strengths + practice suggestions',
+      destination: 'Orchestrator',
+      color: 'amber',
+      status: agentStatuses.coach,
+    },
+    {
+      id: 'orchestrator' as const,
+      label: 'Orchestrator',
+      title: 'Synthesize final report',
+      input: 'Analyzer findings + coaching plan',
+      process: 'Combines agent outputs into a clear assessment summary.',
+      output: 'Cognitive summary + recommendations',
+      destination: 'Final report',
+      color: 'indigo',
+      status: isAllComplete
+        ? 'completed' as const
+        : hasFailed
+          ? 'error' as const
+          : synthesisStarted
+            ? 'running' as const
+            : 'waiting' as const,
+    },
+  ];
   const latestActiveEvent = [...progressEvents].reverse().find(
     (event) => event.status === 'in_progress' && ['evaluation', 'report'].includes(event.stage),
   );
@@ -146,8 +232,6 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
     completed: 'Completed',
     failed: 'Failed',
   };
-  const agentRuntime = (id: AgentId) =>
-    agentExecutionTimes[id] ? `${providerLabel} · ${agentExecutionTimes[id]} ms` : providerLabel;
   const refreshStatus = async () => {
     setIsRefreshingStatus(true);
     try {
@@ -339,162 +423,88 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Agent 1 */}
-          <div
-            onClick={() => onInspectAgent('designer')}
-            className={`cursor-pointer rounded-xl p-4 border transition ${
-              agentStatuses.designer === 'running'
-                ? 'bg-sky-50 border-sky-400 ring-2 ring-sky-200'
-                : agentStatuses.designer === 'completed'
-                ? 'bg-slate-50/80 border-slate-300 hover:border-slate-400'
-                : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">
-                1. Designer
-              </span>
-              {agentStatuses.designer === 'completed' ? (
-                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                </span>
-              ) : agentStatuses.designer === 'running' ? (
-                <span className="text-xs font-semibold text-sky-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-ping motion-reduce:animate-none" /> Active
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Standby</span>
-              )}
-            </div>
-            <h4 className="text-xs font-bold text-slate-900">Item Formulation</h4>
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-              Formulates calibrated reasoning questions.
-            </p>
-            <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>{agentRuntime('designer')}</span>
-              <span className="text-blue-600 font-semibold flex items-center gap-1">
-                <Eye className="w-3 h-3" /> Inspect
-              </span>
-            </div>
-          </div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-2">
+          {flowSteps.map((step, index) => {
+            const isRunning = step.status === 'running';
+            const isCompleted = step.status === 'completed';
+            const inspectAgentId = step.id;
+            const runtimeLabel = inspectAgentId && agentExecutionTimes[inspectAgentId]
+              ? `${providerLabel} · ${agentExecutionTimes[inspectAgentId]} ms`
+              : providerLabel;
+            const statusLabel = step.id === null
+              ? 'Submitted'
+              : isRunning
+                ? 'Active'
+                : isCompleted
+                  ? 'Done'
+                  : step.status === 'error'
+                    ? 'Error'
+                    : 'Waiting';
+            const colors = flowColors[step.color];
+            const card = (
+              <div
+                className={`h-full rounded-xl border p-3 ${
+                  isRunning
+                    ? `${colors.active} ring-2`
+                    : isCompleted
+                      ? 'border-slate-300 bg-slate-50/80'
+                      : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${colors.label}`}>
+                    {step.label}
+                  </span>
+                  <span className={`shrink-0 text-[11px] font-semibold ${
+                    isRunning ? colors.text : isCompleted ? 'text-emerald-700' : step.status === 'error' ? 'text-rose-700' : 'text-slate-400'
+                  }`}>
+                    {statusLabel}
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-slate-900">{step.title}</h4>
+                <dl className="mt-3 space-y-2 text-[11px] leading-snug">
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-slate-400">Input</dt>
+                    <dd className="mt-0.5 text-slate-600">{step.input}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide text-slate-400">Work</dt>
+                    <dd className="mt-0.5 text-slate-600">{step.process}</dd>
+                  </div>
+                  <div className="border-t border-slate-200 pt-2">
+                    <dt className="font-semibold uppercase tracking-wide text-slate-400">Output → {step.destination}</dt>
+                    <dd className="mt-0.5 font-medium text-slate-800">{step.output}</dd>
+                  </div>
+                </dl>
+                {inspectAgentId && (
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200 pt-2">
+                    <span className="text-[10px] text-slate-500">{runtimeLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => onInspectAgent(inspectAgentId)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:text-blue-900"
+                    >
+                      <Eye className="h-3 w-3" /> Inspect payload
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
 
-          {/* Agent 2 */}
-          <div
-            onClick={() => onInspectAgent('analyzer')}
-            className={`cursor-pointer rounded-xl p-4 border transition ${
-              agentStatuses.analyzer === 'running'
-                ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200'
-                : agentStatuses.analyzer === 'completed'
-                ? 'bg-slate-50/80 border-slate-300 hover:border-slate-400'
-                : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                2. Analyzer
-              </span>
-              {agentStatuses.analyzer === 'completed' ? (
-                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                </span>
-              ) : agentStatuses.analyzer === 'running' ? (
-                <span className="text-xs font-semibold text-blue-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping motion-reduce:animate-none" /> Active
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Standby</span>
-              )}
-            </div>
-            <h4 className="text-xs font-bold text-slate-900">Cognitive Diagnosis</h4>
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-              Evaluates answers & checks logical fallacies.
-            </p>
-            <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>{agentRuntime('analyzer')}</span>
-              <span className="text-blue-600 font-semibold flex items-center gap-1">
-                <Eye className="w-3 h-3" /> Inspect
-              </span>
-            </div>
-          </div>
-
-          {/* Agent 3 */}
-          <div
-            onClick={() => onInspectAgent('coach')}
-            className={`cursor-pointer rounded-xl p-4 border transition ${
-              agentStatuses.coach === 'running'
-                ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-200'
-                : agentStatuses.coach === 'completed'
-                ? 'bg-slate-50/80 border-slate-300 hover:border-slate-400'
-                : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                3. Coach
-              </span>
-              {agentStatuses.coach === 'completed' ? (
-                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                </span>
-              ) : agentStatuses.coach === 'running' ? (
-                <span className="text-xs font-semibold text-amber-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping motion-reduce:animate-none" /> Active
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Standby</span>
-              )}
-            </div>
-            <h4 className="text-xs font-bold text-slate-900">Coaching Roadmap</h4>
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-              Generates strengths & 3 targeted drills.
-            </p>
-            <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>{agentRuntime('coach')}</span>
-              <span className="text-blue-600 font-semibold flex items-center gap-1">
-                <Eye className="w-3 h-3" /> Inspect
-              </span>
-            </div>
-          </div>
-
-          {/* Orchestrator */}
-          <div
-            onClick={() => onInspectAgent('orchestrator')}
-            className={`cursor-pointer rounded-xl p-4 border transition ${
-              agentStatuses.orchestrator === 'running'
-                ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200'
-                : agentStatuses.orchestrator === 'completed'
-                ? 'bg-slate-50/80 border-slate-300 hover:border-slate-400'
-                : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
-                Orchestrator
-              </span>
-              {agentStatuses.orchestrator === 'completed' ? (
-                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                </span>
-              ) : agentStatuses.orchestrator === 'running' ? (
-                <span className="text-xs font-semibold text-indigo-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping motion-reduce:animate-none" /> Active
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Standby</span>
-              )}
-            </div>
-            <h4 className="text-xs font-bold text-slate-900">Synthesis Report</h4>
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-              Holistic profile & strategic recommendations.
-            </p>
-            <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>{agentRuntime('orchestrator')}</span>
-              <span className="text-blue-600 font-semibold flex items-center gap-1">
-                <Eye className="w-3 h-3" /> Inspect
-              </span>
-            </div>
-          </div>
+            return (
+              <React.Fragment key={step.label}>
+                <div className="min-w-0 flex-1">
+                  {card}
+                </div>
+                {index < flowSteps.length - 1 && (
+                  <div className="flex shrink-0 items-center justify-center gap-1 text-slate-400 lg:flex-col">
+                    <ArrowRight className="h-4 w-4 rotate-90 lg:rotate-0" aria-hidden="true" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wide">handoff</span>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 
