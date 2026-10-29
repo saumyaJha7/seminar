@@ -13,9 +13,9 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="modal-surface w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] animate-surface-reveal motion-reduce:animate-none">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="p-5 border-b border-indigo-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-violet-50">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
               <Network className="w-4 h-4" />
@@ -36,7 +36,7 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
         {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto">
           {/* Architecture Diagram */}
-          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
+          <div className="bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 p-6 rounded-2xl border border-indigo-100 shadow-inner flex flex-col items-center">
             {/* Top Node */}
             <div className="px-4 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-800 shadow-xs">
               Candidate Assessment Input
@@ -119,7 +119,7 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-4 border-t border-indigo-100 bg-gradient-to-r from-indigo-50 to-cyan-50 flex items-center justify-between text-xs text-slate-600">
           <span>Powered by Groq high-speed inference</span>
           <button
             onClick={onClose}

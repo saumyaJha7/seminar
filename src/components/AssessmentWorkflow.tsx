@@ -154,15 +154,13 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
 
     questions.forEach((q) => {
       const isAnswerOnly = preset.id === 'preset_rushed';
-      const isFlawed = preset.id === 'preset_flawed';
+      const useSampleResponse = preset.id === 'preset_fallacy' || preset.id === 'preset_beginner';
       updatedAnswers[q.id] = {
-        answer: isFlawed
-          ? 'There is not enough information to determine a solution.'
-          : q.expectedAnswer,
-        reasoning: isAnswerOnly
-          ? ''
-          : isFlawed
-            ? 'I made a quick guess without checking each condition.'
+        answer: useSampleResponse ? preset.answers[q.category].answer : q.expectedAnswer,
+        reasoning: useSampleResponse
+          ? preset.answers[q.category].reasoning
+          : isAnswerOnly
+            ? ''
             : q.explanation,
       };
     });
@@ -423,7 +421,7 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
               <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-              Quick Fill:
+              Sample profiles:
             </span>
             {SAMPLE_STUDENT_PRESETS.map((preset) => (
               <button
@@ -432,14 +430,18 @@ export const AssessmentWorkflow: React.FC<AssessmentWorkflowProps> = ({
                 onClick={() => applyPreset(preset.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                   preset.id === 'preset_balanced'
-                    ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                    ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-xs hover:-translate-y-0.5 hover:bg-blue-100 hover:shadow-sm'
                     : preset.id === 'preset_rushed'
-                    ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                    ? 'bg-slate-100 text-slate-700 border-slate-300 shadow-xs hover:-translate-y-0.5 hover:bg-slate-200 hover:shadow-sm'
+                    : preset.id === 'preset_beginner'
+                      ? 'bg-teal-50 text-teal-800 border-teal-200 shadow-xs hover:-translate-y-0.5 hover:bg-teal-100 hover:shadow-sm'
+                      : 'bg-amber-50 text-amber-800 border-amber-200 shadow-xs hover:-translate-y-0.5 hover:bg-amber-100 hover:shadow-sm'
                 }`}
                 title={preset.description}
               >
-                {preset.studentName} ({preset.id === 'preset_balanced' ? 'High Logic' : preset.id === 'preset_rushed' ? 'Answers Only' : 'Common Flaws'})
+                {preset.id === 'preset_beginner'
+                  ? 'New learner · Building confidence'
+                  : `${preset.studentName} (${preset.id === 'preset_balanced' ? 'High Logic' : preset.id === 'preset_rushed' ? 'Answers Only' : 'Common Flaws'})`}
               </button>
             ))}
           </div>

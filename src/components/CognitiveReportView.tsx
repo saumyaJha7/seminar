@@ -224,9 +224,9 @@ ${i + 1}. **${p.title}**
   });
 
   return (
-    <div className="space-y-6">
+    <div className="report-workspace space-y-6">
       {/* 1. Hero Diagnostic Header Card */}
-      <div className="pro-card rounded-2xl p-6 sm:p-8 shadow-xs border-t-4 border-t-blue-600">
+      <div className="report-hero-panel pro-card rounded-2xl p-6 sm:p-8 shadow-xs border-t-4 border-t-blue-600">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -278,7 +278,7 @@ ${i + 1}. **${p.title}**
           </div>
 
           {/* Radial Circular Score Badge */}
-          <div className="flex items-center gap-5 bg-slate-50 border border-slate-200 p-4 rounded-2xl shrink-0">
+          <div className="flex items-center gap-5 rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-blue-100/70 via-indigo-50 to-violet-100/60 p-4 shadow-inner shadow-indigo-950/5 shrink-0">
             <div className="text-right">
               <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Cognitive Index
@@ -364,13 +364,13 @@ ${i + 1}. **${p.title}**
       </div>
 
       {/* 2. Interactive Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-1 overflow-x-auto">
+      <div className="report-tabs flex items-center gap-2 border-b border-indigo-200/80 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('overview')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === 'overview'
-              ? 'bg-blue-50 text-blue-900 border border-blue-300 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-950 border border-blue-300 shadow-sm'
+              : 'text-slate-600 hover:text-indigo-900 hover:bg-indigo-50'
           }`}
         >
           <Brain className="w-4 h-4 text-blue-600" />
@@ -381,8 +381,8 @@ ${i + 1}. **${p.title}**
           onClick={() => setActiveTab('diagnostics')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === 'diagnostics'
-              ? 'bg-blue-50 text-blue-900 border border-blue-300 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-950 border border-blue-300 shadow-sm'
+              : 'text-slate-600 hover:text-indigo-900 hover:bg-indigo-50'
           }`}
         >
           <Search className="w-4 h-4 text-blue-600" />
@@ -393,8 +393,8 @@ ${i + 1}. **${p.title}**
           onClick={() => setActiveTab('coaching')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === 'coaching'
-              ? 'bg-amber-50 text-amber-900 border border-amber-300 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-amber-900 hover:bg-amber-50'
           }`}
         >
           <Award className="w-4 h-4 text-amber-600" />
@@ -406,8 +406,8 @@ ${i + 1}. **${p.title}**
             onClick={() => setActiveTab('history')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
               activeTab === 'history'
-                ? 'bg-slate-100 text-slate-900 border border-slate-300 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-950 border border-violet-300 shadow-sm'
+                : 'text-slate-600 hover:text-violet-900 hover:bg-violet-50'
             }`}
           >
             <History className="w-4 h-4 text-slate-600" />

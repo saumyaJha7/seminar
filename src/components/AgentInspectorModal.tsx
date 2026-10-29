@@ -141,9 +141,9 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="modal-surface relative w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] animate-surface-reveal motion-reduce:animate-none">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 flex items-start justify-between bg-slate-50">
+        <div className="p-5 border-b border-indigo-100 flex items-start justify-between bg-gradient-to-r from-blue-50 to-violet-50">
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-md border ${config.badgeColor}`}>
@@ -172,7 +172,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-200 bg-white">
+        <div className="flex items-center gap-2 px-6 pt-3 border-b border-indigo-100 bg-indigo-50/60">
           <button
             onClick={() => setActiveTab('role')}
             className={`px-3 py-2 text-xs font-bold transition border-b-2 ${
@@ -209,7 +209,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1">{renderContent()}</div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-4 border-t border-indigo-100 bg-gradient-to-r from-indigo-50 to-cyan-50 flex items-center justify-between text-xs text-slate-600">
           <span>Groq inference execution node</span>
           <button
             onClick={onClose}

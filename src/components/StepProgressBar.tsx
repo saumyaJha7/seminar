@@ -57,7 +57,7 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
   ];
 
   return (
-    <div className="w-full bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
+    <div className="step-progress-shell w-full p-2 rounded-2xl border border-indigo-100/80 shadow-md shadow-indigo-950/5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {steps.map((step) => {
           const isActive = currentScreen === step.id;
@@ -72,11 +72,11 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
               onClick={() => onNavigate(step.id)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                 isActive
-                  ? 'bg-blue-50/80 border border-blue-400 shadow-xs text-blue-900'
+                  ? 'bg-gradient-to-r from-blue-100/90 to-indigo-50 border border-blue-300 shadow-sm shadow-blue-900/10 text-blue-950'
                   : isDone
-                  ? 'bg-slate-50 hover:bg-slate-100/70 border border-slate-200 text-slate-700 cursor-pointer'
+                  ? 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-100 text-slate-700 cursor-pointer shadow-xs hover:shadow-sm'
                   : step.isAvailable
-                  ? 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 cursor-pointer'
+                  ? 'bg-violet-50/60 hover:bg-violet-100/80 border border-violet-100 text-slate-600 cursor-pointer'
                   : 'bg-slate-50/50 border border-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
               }`}
             >
@@ -84,9 +84,9 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-sm shadow-blue-900/20'
                     : isDone
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    ? 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-300'
                     : 'bg-slate-100 text-slate-600 border border-slate-200'
                 }`}
               >

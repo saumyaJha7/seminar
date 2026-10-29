@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
+  --background: #eef2ff;
   --foreground: #0f172a;
 }
 
@@ -18,6 +18,31 @@ body {
   font-family: var(--font-sans);
   overflow-x: hidden;
   letter-spacing: -0.01em;
+}
+
+.app-shell {
+  background:
+    radial-gradient(ellipse at 2% 12%, rgba(147, 197, 253, 0.28), transparent 34rem),
+    radial-gradient(ellipse at 96% 28%, rgba(196, 181, 253, 0.25), transparent 33rem),
+    radial-gradient(ellipse at 45% 100%, rgba(153, 246, 228, 0.2), transparent 36rem),
+    linear-gradient(145deg, #f1f5ff 0%, #f5f2ff 52%, #effafa 100%);
+  background-attachment: fixed;
+}
+
+.app-shell [class~="bg-white"] {
+  background-color: rgba(239, 244, 255, 0.92);
+}
+
+.app-shell [class~="bg-white/95"] {
+  background-color: rgba(237, 242, 255, 0.94);
+}
+
+.app-shell [class~="bg-white/80"] {
+  background-color: rgba(239, 244, 255, 0.84);
+}
+
+.app-shell [class~="bg-white/60"] {
+  background-color: rgba(239, 244, 255, 0.68);
 }
 
 .app-shell [class~="text-xs"] {
@@ -52,31 +77,52 @@ body {
 
 /* Background ambient light pattern */
 .bg-light-pattern {
-  background-size: 28px 28px;
-  background-image: 
-    linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 36px 36px;
+  background-image:
+    linear-gradient(to right, rgba(99, 102, 241, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 165, 233, 0.06) 1px, transparent 1px);
 }
 
 /* Ambient soft gradient */
 .ambient-light-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(224, 242, 254, 0.8) 0%, rgba(254, 243, 199, 0.3) 45%, transparent 75%);
+  background:
+    radial-gradient(ellipse at 12% 8%, rgba(125, 211, 252, 0.24), transparent 38%),
+    radial-gradient(ellipse at 86% 20%, rgba(196, 181, 253, 0.2), transparent 34%),
+    radial-gradient(ellipse at 50% 100%, rgba(110, 231, 183, 0.12), transparent 43%);
 }
 
-/* Clean white professional card */
+/* Softly tinted surfaces keep the content readable without stark white panels. */
 .pro-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  background-color: rgba(242, 246, 255, 0.92);
+  border: 1px solid rgba(199, 210, 254, 0.8);
+  box-shadow: 0 8px 24px -18px rgba(49, 46, 129, 0.32), 0 1px 3px rgba(30, 41, 59, 0.04);
+  transition: box-shadow 220ms ease, border-color 220ms ease, transform 220ms ease, background-color 220ms ease;
+}
+
+.app-shell .pro-card:hover {
+  border-color: rgba(165, 180, 252, 0.88);
+  box-shadow: 0 14px 30px -20px rgba(49, 46, 129, 0.36), 0 3px 8px rgba(30, 41, 59, 0.05);
 }
 
 .pro-card-hover {
   transition: all 0.2s ease-in-out;
 }
 .pro-card-hover:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  transform: translateY(-1px);
+  border-color: #a5b4fc;
+  box-shadow: 0 12px 24px -16px rgba(49, 46, 129, 0.35), 0 2px 5px rgba(30, 41, 59, 0.05);
+  transform: translateY(-2px);
+}
+
+.app-navbar {
+  background: linear-gradient(100deg, rgba(239, 246, 255, 0.94), rgba(245, 243, 255, 0.92) 58%, rgba(236, 254, 255, 0.92));
+}
+
+.step-progress-shell {
+  background: linear-gradient(125deg, rgba(239, 246, 255, 0.95), rgba(245, 243, 255, 0.94) 56%, rgba(240, 253, 250, 0.92));
+}
+
+.app-footer {
+  background: linear-gradient(90deg, rgba(224, 231, 255, 0.78), rgba(237, 233, 254, 0.82), rgba(207, 250, 254, 0.7));
 }
 
 .assessment-workspace {
@@ -98,7 +144,39 @@ body {
 .pipeline-sequence-panel {
   background:
     radial-gradient(ellipse at 96% 0%, rgba(199, 210, 254, 0.32), transparent 26rem),
-    linear-gradient(145deg, #ffffff 0%, #f7f8ff 60%, #f0f9ff 100%);
+    linear-gradient(145deg, #eff4ff 0%, #f1f0ff 60%, #eaf8ff 100%);
+}
+
+.report-workspace {
+  position: relative;
+  isolation: isolate;
+  margin-inline: -0.5rem;
+  border-radius: 2rem;
+  padding: 0.75rem;
+  background:
+    radial-gradient(ellipse at 4% 0%, rgba(125, 211, 252, 0.22), transparent 30rem),
+    radial-gradient(ellipse at 98% 20%, rgba(196, 181, 253, 0.22), transparent 32rem),
+    linear-gradient(145deg, rgba(239, 246, 255, 0.84), rgba(245, 243, 255, 0.84) 56%, rgba(240, 253, 250, 0.82));
+}
+
+.report-hero-panel {
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(196, 181, 253, 0.26), transparent 30rem),
+    linear-gradient(125deg, rgba(239, 246, 255, 0.98), rgba(238, 242, 255, 0.95) 58%, rgba(236, 254, 255, 0.94));
+  box-shadow: 0 18px 36px -28px rgba(49, 46, 129, 0.42);
+}
+
+@media (min-width: 40rem) {
+  .report-workspace {
+    margin-inline: -0.75rem;
+    padding: 1.25rem;
+  }
+}
+
+.modal-surface {
+  background: linear-gradient(145deg, #f4f7ff, #f5f3ff 58%, #effbfb);
+  border-color: rgba(199, 210, 254, 0.85);
+  box-shadow: 0 28px 80px -30px rgba(15, 23, 42, 0.55);
 }
 
 /* Page Transition Animation */
@@ -115,6 +193,21 @@ body {
 
 .animate-page-enter {
   animation: pageSlideIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes surfaceReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-surface-reveal {
+  animation: surfaceReveal 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes agentStageSwitch {

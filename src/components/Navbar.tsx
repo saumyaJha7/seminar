@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Key, Network, ShieldCheck, Brain, ExternalLink } from 'lucide-react';
+import { Key, Network, Brain } from 'lucide-react';
 
 interface NavbarProps {
   hasGroqKey: boolean;
@@ -15,11 +15,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenArchitectureModal,
 }) => {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs">
+    <header className="app-navbar sticky top-0 z-50 w-full border-b border-indigo-100/80 backdrop-blur-xl shadow-sm shadow-indigo-950/5">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-violet-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shadow-sm shadow-indigo-900/10 transition-transform duration-300 hover:-rotate-3 hover:scale-105">
             <Brain className="w-5 h-5" />
           </div>
           <div>
@@ -42,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Blueprint button */}
           <button
             onClick={onOpenArchitectureModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-100 hover:border-indigo-200 shadow-xs hover:shadow-sm transition-all duration-200"
           >
             <Network className="w-3.5 h-3.5 text-blue-600" />
             <span className="hidden sm:inline">Agent Architecture</span>
@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               hasGroqKey
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70'
                 : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100/70'
-            }`}
+            } shadow-xs hover:shadow-sm`}
           >
             <span
               className={`w-2 h-2 rounded-full ${

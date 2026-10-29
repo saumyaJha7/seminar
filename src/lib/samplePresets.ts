@@ -45,6 +45,26 @@ export const SAMPLE_STUDENT_PRESETS: SampleStudentPreset[] = [
     },
   },
   {
+    id: 'preset_beginner',
+    label: 'New Learner (Building Confidence)',
+    studentName: 'Alex Morgan',
+    description: 'A beginner-friendly demo profile with tentative first guesses and brief reasoning. Use it as sample data, not a real student record.',
+    answers: {
+      logical_reasoning: {
+        answer: 'I think the conclusion is probably true because the statements seem related.',
+        reasoning: 'This is my first guess. I am not sure how to check whether the information proves it.',
+      },
+      pattern_recognition: {
+        answer: 'I guessed by repeating the most obvious change I noticed.',
+        reasoning: 'I only checked the last step and did not compare all the changes yet.',
+      },
+      problem_solving: {
+        answer: 'I picked the first arrangement that seemed possible.',
+        reasoning: 'I tried a quick guess but did not check every condition, so I may have missed something.',
+      },
+    },
+  },
+  {
     id: 'preset_fallacy',
     label: 'Intuitive but Falls for Heuristic Traps',
     studentName: 'Samira Khan',

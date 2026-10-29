@@ -14,8 +14,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, hasEn
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div className="modal-surface w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-surface-reveal motion-reduce:animate-none">
+        <div className="p-5 border-b border-indigo-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-violet-50">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
               <Key className="w-4 h-4" />
