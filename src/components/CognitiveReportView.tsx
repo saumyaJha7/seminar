@@ -23,8 +23,7 @@ import {
   History,
   Lightbulb,
 } from 'lucide-react';
-import { BLOOM_LEVELS, BloomLevel, FinalAssessmentReport, QuestionCategory } from '@/types/assessment';
-import { buildCognitiveProfile, MIN_BLOOM_EVIDENCE_COUNT } from '@/lib/assessment-contracts';
+import { FinalAssessmentReport, QuestionCategory } from '@/types/assessment';
 
 interface CognitiveReportViewProps {
   report: FinalAssessmentReport;
@@ -43,8 +42,6 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
   const [copiedDrillIdx, setCopiedDrillIdx] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'diagnostics' | 'coaching' | 'history'>('overview');
   const [filterVerdict, setFilterVerdict] = useState<'all' | 'sound' | 'review'>('all');
-  const cognitiveProfile = report.analyzerOutput.cognitiveProfile ??
-    buildCognitiveProfile(report.analyzerOutput.evaluations, report.designerOutput.questions);
   const answeredEvaluations = report.analyzerOutput.evaluations.filter(
     (evaluation) => evaluation.answerCorrectness !== 'unanswered',
   );
@@ -55,15 +52,6 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
     hasCategoryAnswers(category) ? `${score}%` : 'N/A';
   const categoryScoreBadge = (category: QuestionCategory, score: number) =>
     !hasCategoryAnswers(category) ? 'Not assessed' : score >= 85 ? 'Exemplary' : 'Developing';
-  const bloomLabels: Record<BloomLevel, string> = {
-    remember: 'Remember',
-    understand: 'Understand',
-    apply: 'Apply',
-    analyze: 'Analyze',
-    evaluate: 'Evaluate',
-    create: 'Create',
-  };
-
   const getVerdictBadge = (isCorrect: boolean | 'partial' | 'uncertain' | 'unanswered') => {
     if (isCorrect === true) {
       return (
@@ -522,42 +510,6 @@ ${i + 1}. **${p.title}**
               </div>
             </div>
 
-            <section className="pro-card rounded-2xl p-6 shadow-xs" aria-labelledby="bloom-profile-title">
-              <div className="mb-5">
-                <h3 id="bloom-profile-title" className="text-sm font-bold text-slate-900">
-                  Bloom&apos;s Cognitive Profile
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Scores average answered questions. Levels with fewer than {MIN_BLOOM_EVIDENCE_COUNT} responses are marked insufficient, not as zero performance.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {BLOOM_LEVELS.map((level) => {
-                  const score = cognitiveProfile.scores[level];
-                  const count = cognitiveProfile.evidenceCounts[level];
-                  const insufficient = cognitiveProfile.insufficientEvidenceLevels.includes(level);
-                  return (
-                    <div key={level} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold text-slate-800">{bloomLabels[level]}</span>
-                        <span className="text-xs font-mono text-slate-600">
-                          {insufficient || score === null ? 'Insufficient evidence' : `${score}/100`}
-                        </span>
-                      </div>
-                      <div className="mt-3 h-2 w-full rounded-full bg-slate-200" aria-hidden="true">
-                        <div
-                          className="h-2 rounded-full bg-blue-600 transition-all"
-                          style={{ width: `${insufficient ? 0 : score ?? 0}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-[11px] text-slate-500">
-                        {count} answered {count === 1 ? 'question' : 'questions'}; {Math.max(0, MIN_BLOOM_EVIDENCE_COUNT - count)} more needed for interpretation
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
           </div>
         </div>
       )}
