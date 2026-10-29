@@ -40,7 +40,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden bg-slate-50 text-slate-900">
+    <div className="app-shell min-h-screen flex flex-col relative overflow-hidden bg-slate-50 text-slate-900">
       {/* Background ambient lighting */}
       <div className="fixed inset-0 ambient-light-glow pointer-events-none z-0" />
       <div className="fixed inset-0 bg-light-pattern opacity-50 pointer-events-none z-0" />

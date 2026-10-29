@@ -20,6 +20,36 @@ body {
   letter-spacing: -0.01em;
 }
 
+.app-shell [class~="text-xs"] {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.app-shell [class~="text-sm"] {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.app-shell [class~="text-[11px]"] {
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.app-shell [class~="text-[10px]"] {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.app-shell [class~="text-slate-400"]:not(svg) {
+  color: #64748b;
+}
+
+@media (min-width: 40rem) {
+  .app-shell [class~="text-xs"][class~="sm:text-sm"] {
+    font-size: 0.9375rem;
+  }
+}
+
 /* Background ambient light pattern */
 .bg-light-pattern {
   background-size: 28px 28px;
