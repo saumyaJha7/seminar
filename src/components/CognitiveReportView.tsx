@@ -18,14 +18,13 @@ import {
   Check,
   Download,
   Calendar,
-  Layers,
   ArrowRight,
-  TrendingUp,
   BarChart3,
   History,
   Lightbulb,
 } from 'lucide-react';
-import { FinalAssessmentReport } from '@/types/assessment';
+import { BLOOM_LEVELS, BloomLevel, FinalAssessmentReport, QuestionCategory } from '@/types/assessment';
+import { buildCognitiveProfile, MIN_BLOOM_EVIDENCE_COUNT } from '@/lib/assessment-contracts';
 
 interface CognitiveReportViewProps {
   report: FinalAssessmentReport;
@@ -44,8 +43,28 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
   const [copiedDrillIdx, setCopiedDrillIdx] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'diagnostics' | 'coaching' | 'history'>('overview');
   const [filterVerdict, setFilterVerdict] = useState<'all' | 'sound' | 'review'>('all');
+  const cognitiveProfile = report.analyzerOutput.cognitiveProfile ??
+    buildCognitiveProfile(report.analyzerOutput.evaluations, report.designerOutput.questions);
+  const answeredEvaluations = report.analyzerOutput.evaluations.filter(
+    (evaluation) => evaluation.answerCorrectness !== 'unanswered',
+  );
+  const hasAnsweredEvaluations = answeredEvaluations.length > 0;
+  const hasCategoryAnswers = (category: QuestionCategory) =>
+    answeredEvaluations.some((evaluation) => evaluation.category === category);
+  const categoryScoreLabel = (category: QuestionCategory, score: number) =>
+    hasCategoryAnswers(category) ? `${score}%` : 'N/A';
+  const categoryScoreBadge = (category: QuestionCategory, score: number) =>
+    !hasCategoryAnswers(category) ? 'Not assessed' : score >= 85 ? 'Exemplary' : 'Developing';
+  const bloomLabels: Record<BloomLevel, string> = {
+    remember: 'Remember',
+    understand: 'Understand',
+    apply: 'Apply',
+    analyze: 'Analyze',
+    evaluate: 'Evaluate',
+    create: 'Create',
+  };
 
-  const getVerdictBadge = (isCorrect: boolean | 'partial') => {
+  const getVerdictBadge = (isCorrect: boolean | 'partial' | 'uncertain' | 'unanswered') => {
     if (isCorrect === true) {
       return (
         <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -62,6 +81,22 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
         </span>
       );
     }
+    if (isCorrect === 'uncertain') {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          <AlertTriangle className="w-3.5 h-3.5 text-slate-500" />
+          Uncertain
+        </span>
+      );
+    }
+    if (isCorrect === 'unanswered') {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          <XCircle className="w-3.5 h-3.5 text-slate-500" />
+          Not answered
+        </span>
+      );
+    }
     return (
       <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
         <XCircle className="w-3.5 h-3.5 text-rose-600" />
@@ -75,8 +110,12 @@ export const CognitiveReportView: React.FC<CognitiveReportViewProps> = ({
 **Student Name:** ${report.studentName}
 **Assessment ID:** ${report.assessmentId}
 **Date:** ${new Date(report.timestamp).toLocaleString()}
+**Focus area:** ${report.focusArea || 'Not specified'}
+**Difficulty:** ${report.difficulty || 'Not specified'}
+**Question count:** ${report.questionCount ?? report.designerOutput.questions.length}
+**Target Bloom levels:** ${(report.targetBloomLevels ?? [...new Set(report.designerOutput.questions.map((question) => question.bloomLevel))]).join(', ')}
 **Cognitive Archetype:** ${report.orchestratorSynthesis.cognitiveProfileType}
-**Overall Cognitive Score:** ${report.overallScore}/100
+**Overall Cognitive Score:** ${hasAnsweredEvaluations ? `${report.overallScore}/100` : 'Not available (no responses submitted)'}
 
 ---
 
@@ -88,10 +127,10 @@ ${report.orchestratorSynthesis.executiveSummary}
 ---
 
 ## Cognitive Dimension Scores
-- Logical Reasoning: ${report.categoryScores.logicalReasoning}/100
-- Pattern Recognition: ${report.categoryScores.patternRecognition}/100
-- Problem Solving: ${report.categoryScores.problemSolving}/100
-- Reasoning Clarity: ${report.reasoningClarityScore}/100
+- Logical Reasoning: ${categoryScoreLabel('logical_reasoning', report.categoryScores.logicalReasoning)}
+- Pattern Recognition: ${categoryScoreLabel('pattern_recognition', report.categoryScores.patternRecognition)}
+- Problem Solving: ${categoryScoreLabel('problem_solving', report.categoryScores.problemSolving)}
+- Reasoning Clarity: ${report.reasoningClarityScore === null ? 'Insufficient evidence' : `${report.reasoningClarityScore}/100`}
 
 ---
 
@@ -104,7 +143,7 @@ ${report.analyzerOutput.evaluations
 - **Student Answer:** ${ev.studentAnswer}
 - **Student Reasoning:** ${ev.studentReasoning || 'None articulated'}
 - **Expected Deduction:** ${ev.expectedAnswer}
-- **Verdict:** ${ev.isCorrect === true ? 'Correct' : ev.isCorrect === 'partial' ? 'Partial' : 'Incorrect'} (${ev.score}/100)
+- **Verdict:** ${ev.isCorrect === true ? 'Correct' : ev.isCorrect === 'partial' ? 'Partial' : ev.isCorrect === 'uncertain' ? 'Uncertain' : ev.isCorrect === 'unanswered' ? 'Not answered' : 'Incorrect'} (${ev.score}/100)
 - **Cognitive Error Analysis:** ${ev.cognitiveErrorAnalysis}
 - **Demonstrated Strengths:** ${ev.demonstratedStrengths}
 `
@@ -174,6 +213,11 @@ ${i + 1}. **${p.title}**
               <span className="text-xs text-slate-500 font-mono">
                 REF: {report.assessmentId}
               </span>
+              {report.mode === 'demo' && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
+                  Demo Mode
+                </span>
+              )}
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -186,6 +230,18 @@ ${i + 1}. **${p.title}**
               </span>
               <span>•</span>
               <span>{report.gradeLevel || 'Secondary Level'}</span>
+              {report.difficulty && (
+                <>
+                  <span>•</span>
+                  <span className="capitalize">{report.difficulty} difficulty</span>
+                </>
+              )}
+              <span>•</span>
+              <span>{report.questionCount ?? report.designerOutput.questions.length} questions</span>
+              <span>•</span>
+              <span className="max-w-xs truncate" title={report.focusArea || undefined}>
+                Focus: {report.focusArea || 'Not specified'}
+              </span>
               <span>•</span>
               <span className="flex items-center gap-1 text-slate-500">
                 <Calendar className="w-3.5 h-3.5" />
@@ -205,7 +261,9 @@ ${i + 1}. **${p.title}**
                 Cognitive Index
               </span>
               <span className="text-xs text-blue-700 font-bold">
-                {report.overallScore >= 90
+                {!hasAnsweredEvaluations
+                  ? 'Insufficient evidence'
+                  : report.overallScore >= 90
                   ? 'Superior Tier'
                   : report.overallScore >= 75
                   ? 'Proficient Tier'
@@ -230,18 +288,21 @@ ${i + 1}. **${p.title}**
                   stroke="currentColor"
                   strokeWidth="5"
                   strokeDasharray={175.9}
-                  strokeDashoffset={175.9 - (175.9 * report.overallScore) / 100}
-                  className="text-blue-600 transition-all duration-1000 ease-out"
+                  strokeDashoffset={hasAnsweredEvaluations ? 175.9 - (175.9 * report.overallScore) / 100 : 175.9}
+                  className="text-blue-600 transition-all duration-1000 ease-out motion-reduce:transition-none"
                   strokeLinecap="round"
                   fill="transparent"
                 />
               </svg>
               <span className="absolute font-bold text-lg text-slate-900">
-                {report.overallScore}
+                {hasAnsweredEvaluations ? report.overallScore : 'N/A'}
               </span>
             </div>
           </div>
         </div>
+        <p className="mt-3 text-[11px] text-slate-500">
+          Target Bloom levels: {(report.targetBloomLevels ?? [...new Set(report.designerOutput.questions.map((question) => question.bloomLevel))]).join(', ')}
+        </p>
 
         {/* Global Report Action Controls */}
         <div className="mt-6 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
@@ -334,7 +395,7 @@ ${i + 1}. **${p.title}**
 
       {/* TAB 1: EXECUTIVE OVERVIEW */}
       {activeTab === 'overview' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-6 animate-in fade-in duration-200 motion-reduce:animate-none motion-reduce:transition-none">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Orchestrator Executive Synthesis Card */}
             <div className="lg:col-span-2 pro-card rounded-2xl p-6 shadow-xs">
@@ -356,58 +417,30 @@ ${i + 1}. **${p.title}**
               </div>
             </div>
 
-            {/* Cohort Benchmark Card */}
+            {/* Score interpretation */}
             <div className="pro-card rounded-2xl p-6 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <BarChart3 className="w-4 h-4 text-blue-600" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Cohort Comparison
+                    Score Interpretation
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Compared against standard analytical benchmarks for {report.gradeLevel || 'Secondary Level'}.
+                  An estimate from this assessment&apos;s question-level rubrics. It is not norm-referenced or a clinical measure.
                 </p>
-                <div className="space-y-3 font-mono text-xs">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-blue-900 font-bold">Candidate Score</span>
-                      <span className="text-blue-700 font-bold">{report.overallScore}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-1000"
-                        style={{ width: `${report.overallScore}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-500">Cohort Population Mean</span>
-                      <span className="text-slate-700">72%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div
-                        className="bg-slate-400 h-2 rounded-full transition-all duration-1000"
-                        style={{ width: '72%' }}
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-emerald-700 font-semibold">
-                <span className="flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  Comparative Margin:
-                </span>
-                <span>+{report.overallScore - 72}% Above Average</span>
+              <div className="mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600">
+                Score: <strong className="text-slate-900">
+                  {hasAnsweredEvaluations ? `${report.overallScore}/100` : 'Not available — no responses submitted'}
+                </strong>
+                <span className="block mt-1">No population comparison is available for this project.</span>
               </div>
             </div>
           </div>
 
-          {/* 4 Cognitive Dimension Cards */}
+          {/* Assessment dimension cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="pro-card rounded-xl p-5 shadow-xs border-l-4 border-l-blue-500">
               <span className="block text-xs font-semibold text-slate-500 mb-1">
@@ -415,16 +448,16 @@ ${i + 1}. **${p.title}**
               </span>
               <div className="flex items-baseline justify-between mb-2">
                 <span className="text-2xl font-bold text-slate-900">
-                  {report.categoryScores.logicalReasoning}%
+                  {categoryScoreLabel('logical_reasoning', report.categoryScores.logicalReasoning)}
                 </span>
                 <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                  {report.categoryScores.logicalReasoning >= 85 ? 'Exemplary' : 'Sound'}
+                  {categoryScoreBadge('logical_reasoning', report.categoryScores.logicalReasoning)}
                 </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${report.categoryScores.logicalReasoning}%` }}
+                  style={{ width: `${hasCategoryAnswers('logical_reasoning') ? report.categoryScores.logicalReasoning : 0}%` }}
                 />
               </div>
             </div>
@@ -435,16 +468,16 @@ ${i + 1}. **${p.title}**
               </span>
               <div className="flex items-baseline justify-between mb-2">
                 <span className="text-2xl font-bold text-slate-900">
-                  {report.categoryScores.patternRecognition}%
+                  {categoryScoreLabel('pattern_recognition', report.categoryScores.patternRecognition)}
                 </span>
                 <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                  {report.categoryScores.patternRecognition >= 85 ? 'Exemplary' : 'Sound'}
+                  {categoryScoreBadge('pattern_recognition', report.categoryScores.patternRecognition)}
                 </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div
                   className="bg-indigo-600 h-2 rounded-full"
-                  style={{ width: `${report.categoryScores.patternRecognition}%` }}
+                  style={{ width: `${hasCategoryAnswers('pattern_recognition') ? report.categoryScores.patternRecognition : 0}%` }}
                 />
               </div>
             </div>
@@ -455,16 +488,16 @@ ${i + 1}. **${p.title}**
               </span>
               <div className="flex items-baseline justify-between mb-2">
                 <span className="text-2xl font-bold text-slate-900">
-                  {report.categoryScores.problemSolving}%
+                  {categoryScoreLabel('problem_solving', report.categoryScores.problemSolving)}
                 </span>
                 <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                  {report.categoryScores.problemSolving >= 85 ? 'Exemplary' : 'Sound'}
+                  {categoryScoreBadge('problem_solving', report.categoryScores.problemSolving)}
                 </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div
                   className="bg-amber-500 h-2 rounded-full"
-                  style={{ width: `${report.categoryScores.problemSolving}%` }}
+                  style={{ width: `${hasCategoryAnswers('problem_solving') ? report.categoryScores.problemSolving : 0}%` }}
                 />
               </div>
             </div>
@@ -475,26 +508,63 @@ ${i + 1}. **${p.title}**
               </span>
               <div className="flex items-baseline justify-between mb-2">
                 <span className="text-2xl font-bold text-slate-900">
-                  {report.reasoningClarityScore}%
+                  {report.reasoningClarityScore === null ? 'N/A' : `${report.reasoningClarityScore}%`}
                 </span>
                 <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                  Articulated
+                  {report.reasoningClarityScore === null ? 'Not assessed' : 'Articulated'}
                 </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div
                   className="bg-emerald-600 h-2 rounded-full"
-                  style={{ width: `${report.reasoningClarityScore}%` }}
+                  style={{ width: `${report.reasoningClarityScore ?? 0}%` }}
                 />
               </div>
             </div>
+
+            <section className="pro-card rounded-2xl p-6 shadow-xs" aria-labelledby="bloom-profile-title">
+              <div className="mb-5">
+                <h3 id="bloom-profile-title" className="text-sm font-bold text-slate-900">
+                  Bloom&apos;s Cognitive Profile
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Scores average answered questions. Levels with fewer than {MIN_BLOOM_EVIDENCE_COUNT} responses are marked insufficient, not as zero performance.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {BLOOM_LEVELS.map((level) => {
+                  const score = cognitiveProfile.scores[level];
+                  const count = cognitiveProfile.evidenceCounts[level];
+                  const insufficient = cognitiveProfile.insufficientEvidenceLevels.includes(level);
+                  return (
+                    <div key={level} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold text-slate-800">{bloomLabels[level]}</span>
+                        <span className="text-xs font-mono text-slate-600">
+                          {insufficient || score === null ? 'Insufficient evidence' : `${score}/100`}
+                        </span>
+                      </div>
+                      <div className="mt-3 h-2 w-full rounded-full bg-slate-200" aria-hidden="true">
+                        <div
+                          className="h-2 rounded-full bg-blue-600 transition-all"
+                          style={{ width: `${insufficient ? 0 : score ?? 0}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        {count} answered {count === 1 ? 'question' : 'questions'}; {Math.max(0, MIN_BLOOM_EVIDENCE_COUNT - count)} more needed for interpretation
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
         </div>
       )}
 
       {/* TAB 2: EVIDENCE DIAGNOSTICS */}
       {activeTab === 'diagnostics' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200 motion-reduce:animate-none motion-reduce:transition-none">
           <div className="flex items-center justify-between pb-2">
             <span className="text-xs font-medium text-slate-600">
               Deductions evaluated against logical rule benchmarks:
@@ -541,6 +611,9 @@ ${i + 1}. **${p.title}**
                     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
                       {ev.categoryTitle}
                     </span>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+                      Bloom: {ev.bloomLevel ?? 'unclassified'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-bold text-slate-700">
@@ -576,6 +649,25 @@ ${i + 1}. **${p.title}**
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 text-xs">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <span className="block text-slate-500">Answer correctness</span>
+                    <strong className="text-slate-800">{ev.answerCorrectnessScore ?? ev.score}/100</strong>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <span className="block text-slate-500">Reasoning quality</span>
+                    <strong className="text-slate-800">
+                      {ev.reasoningQualityScore == null ? 'Not assessed' : `${ev.reasoningQualityScore}/100`}
+                    </strong>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <span className="block text-slate-500">Evaluation confidence</span>
+                    <strong className="text-slate-800">
+                      {typeof ev.confidence === 'number' ? `${Math.round(ev.confidence * 100)}%` : 'Not available'}
+                    </strong>
+                  </div>
+                </div>
+
                 {/* Diagnostics */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="p-4 rounded-xl bg-orange-50/70 border border-orange-200">
@@ -592,6 +684,14 @@ ${i + 1}. **${p.title}**
                     <p className="text-emerald-950 leading-relaxed">{ev.demonstratedStrengths}</p>
                   </div>
                 </div>
+                {(ev.evidence?.length ?? 0) > 0 && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-xs">
+                    <span className="block font-bold text-blue-900 mb-1">Evidence from this response</span>
+                    <ul className="list-disc list-inside space-y-1 text-blue-950">
+                      {ev.evidence?.map((item, evidenceIndex) => <li key={`${ev.questionId}-${evidenceIndex}`}>{item}</li>)}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -600,7 +700,7 @@ ${i + 1}. **${p.title}**
 
       {/* TAB 3: GROWTH ROADMAP & DRILLS */}
       {activeTab === 'coaching' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-6 animate-in fade-in duration-200 motion-reduce:animate-none motion-reduce:transition-none">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Strengths Card */}
             <div className="pro-card rounded-2xl p-6 shadow-xs border-t-4 border-t-emerald-500">
@@ -691,7 +791,7 @@ ${i + 1}. **${p.title}**
 
       {/* TAB 4: HISTORY */}
       {activeTab === 'history' && history.length > 0 && (
-        <div className="pro-card rounded-2xl p-6 shadow-xs animate-in fade-in duration-200">
+        <div className="pro-card rounded-2xl p-6 shadow-xs animate-in fade-in duration-200 motion-reduce:animate-none motion-reduce:transition-none">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-4">
             Locally Stored Assessment Sessions
           </h4>

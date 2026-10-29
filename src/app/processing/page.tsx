@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { AgentWorkingScreen } from '@/components/AgentWorkingScreen';
 import { useAssessment } from '@/context/AssessmentContext';
@@ -15,6 +15,13 @@ export default function ProcessingPage() {
     logs,
     isEvaluating,
     report,
+    assessmentId,
+    assessmentMode,
+    assessmentStatus,
+    requestError,
+    progressEvents,
+    retryAssessment,
+    refreshAssessmentStatus,
     setInspectingAgentId,
   } = useAssessment();
 
@@ -28,9 +35,16 @@ export default function ProcessingPage() {
         logs={logs}
         isEvaluating={isEvaluating}
         report={report}
+        assessmentId={assessmentId}
+        assessmentMode={assessmentMode}
+        assessmentStatus={assessmentStatus}
+        requestError={requestError}
+        progressEvents={progressEvents}
         onInspectAgent={(id) => setInspectingAgentId(id)}
         onViewReport={() => router.push('/report')}
         onBackToSetup={() => router.push('/')}
+        onRetry={retryAssessment}
+        onRefreshStatus={refreshAssessmentStatus}
       />
     </div>
   );

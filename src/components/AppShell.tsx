@@ -14,8 +14,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const router = useRouter();
   const {
     hasServerGroqKey,
-    clientGroqKey,
-    saveClientGroqKey,
     isApiKeyModalOpen,
     setIsApiKeyModalOpen,
     isArchitectureModalOpen,
@@ -27,7 +25,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isEvaluating,
   } = useAssessment();
 
-  const isGroqConnected = Boolean(hasServerGroqKey || clientGroqKey);
+  const isGroqConnected = hasServerGroqKey;
 
   const getCurrentScreen = (): AppScreen => {
     if (pathname === '/processing') return 'working';
@@ -80,8 +78,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
-        apiKey={clientGroqKey}
-        onSaveApiKey={saveClientGroqKey}
         hasEnvKey={hasServerGroqKey}
       />
 

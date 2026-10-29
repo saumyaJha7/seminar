@@ -1,11 +1,28 @@
 import Groq from 'groq-sdk';
 
-export function getGroqClient(apiKeyOverride?: string): Groq | null {
-  const apiKey = apiKeyOverride || process.env.GROQ_API_KEY;
+const GROQ_REQUEST_TIMEOUT_MS = 45_000;
+const GROQ_MAX_RETRIES = 1;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isModelNotFoundError(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+  return error.status === 404 ||
+    (isRecord(error.error) && error.error.code === 'model_not_found');
+}
+
+export function getGroqClient(): Groq | null {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey.trim() === '' || apiKey === 'your_groq_api_key_here') {
     return null;
   }
-  return new Groq({ apiKey: apiKey.trim() });
+  return new Groq({
+    apiKey: apiKey.trim(),
+    timeout: GROQ_REQUEST_TIMEOUT_MS,
+    maxRetries: GROQ_MAX_RETRIES,
+  });
 }
 
 export const DEFAULT_GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
@@ -21,22 +38,20 @@ export async function callGroqChat({
   messages,
   temperature = 0.4,
   max_tokens = 2048,
-  apiKeyOverride,
   model = DEFAULT_GROQ_MODEL,
 }: {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   temperature?: number;
   max_tokens?: number;
-  apiKeyOverride?: string;
   model?: string;
 }): Promise<string> {
-  const groq = getGroqClient(apiKeyOverride);
+  const groq = getGroqClient();
   if (!groq) {
     throw new Error('GROQ_API_KEY_NOT_CONFIGURED');
   }
 
   const candidateModels = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   for (const candidateModel of candidateModels) {
     try {
@@ -48,17 +63,16 @@ export async function callGroqChat({
       });
 
       return response.choices[0]?.message?.content || '';
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      // If error is 404 model not found, try next candidate model
-      if (err?.status === 404 || err?.error?.code === 'model_not_found') {
+      if (isModelNotFoundError(err)) {
         continue;
       }
       throw err;
     }
   }
 
-  throw lastError || new Error('All Groq model attempts failed');
+  throw lastError ?? new Error('All Groq model attempts failed');
 }
 
 /**

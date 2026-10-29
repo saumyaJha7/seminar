@@ -16,7 +16,15 @@ import {
   Layers,
   RotateCcw,
 } from 'lucide-react';
-import { AgentId, AgentLogEntry, AgentStatus, FinalAssessmentReport } from '@/types/assessment';
+import {
+  AgentId,
+  AgentLogEntry,
+  AgentStatus,
+  AssessmentProgressEvent,
+  AssessmentLifecycleStatus,
+  AssessmentMode,
+  FinalAssessmentReport,
+} from '@/types/assessment';
 
 interface AgentWorkingScreenProps {
   studentName: string;
@@ -26,9 +34,16 @@ interface AgentWorkingScreenProps {
   logs: AgentLogEntry[];
   isEvaluating: boolean;
   report: FinalAssessmentReport | null;
+  assessmentId: string | null;
+  assessmentMode: AssessmentMode | null;
+  assessmentStatus: AssessmentLifecycleStatus | null;
+  requestError: string | null;
+  progressEvents: AssessmentProgressEvent[];
   onInspectAgent: (agentId: AgentId) => void;
   onViewReport: () => void;
   onBackToSetup: () => void;
+  onRetry: () => void;
+  onRefreshStatus: () => Promise<void>;
 }
 
 export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
@@ -39,17 +54,27 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   logs,
   isEvaluating,
   report,
+  assessmentId,
+  assessmentMode,
+  assessmentStatus,
+  requestError,
+  progressEvents,
   onInspectAgent,
   onViewReport,
   onBackToSetup,
+  onRetry,
+  onRefreshStatus,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [clockTimestamp, setClockTimestamp] = useState(0);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isEvaluating) {
       interval = setInterval(() => {
         setElapsedSeconds((prev) => prev + 1);
+        setClockTimestamp(Date.now());
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -102,13 +127,41 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
   };
 
   const activeAgent = getAgentDetails(activeAgentId);
-  const isAllComplete = Boolean(report && !isEvaluating);
+  const isAllComplete = Boolean(report && assessmentStatus === 'completed' && !isEvaluating);
+  const hasFailed = assessmentStatus === 'failed';
+  const latestActiveEvent = [...progressEvents].reverse().find(
+    (event) => event.status === 'in_progress' && ['evaluation', 'report'].includes(event.stage),
+  );
+  const activeEventElapsed = latestActiveEvent
+    ? Math.max(0, Math.floor((clockTimestamp - new Date(latestActiveEvent.timestamp).getTime()) / 1000))
+    : elapsedSeconds;
+  const isSlowProcessing = isEvaluating && activeEventElapsed >= 30;
+  const providerLabel = assessmentMode === 'demo' ? 'Demo Mode' : 'Groq API';
+  const lifecycleLabel: Record<AssessmentLifecycleStatus, string> = {
+    queued: 'Queued',
+    generating_questions: 'Generating questions',
+    awaiting_answers: 'Awaiting answers',
+    evaluating: 'Evaluating responses',
+    generating_report: 'Building report',
+    completed: 'Completed',
+    failed: 'Failed',
+  };
+  const agentRuntime = (id: AgentId) =>
+    agentExecutionTimes[id] ? `${providerLabel} · ${agentExecutionTimes[id]} ms` : providerLabel;
+  const refreshStatus = async () => {
+    setIsRefreshingStatus(true);
+    try {
+      await onRefreshStatus();
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* 1. Active Agent Spotlight Hero Card */}
       <div
-        className={`pro-card rounded-2xl p-6 sm:p-8 transition-all duration-300 shadow-sm ${
+        className={`pro-card rounded-2xl p-6 sm:p-8 transition-all duration-300 motion-reduce:transition-none shadow-sm ${
           isAllComplete
             ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-white border-emerald-300'
             : 'bg-gradient-to-r from-blue-50/80 via-sky-50/50 to-white border-blue-200'
@@ -127,7 +180,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
               </div>
               {isEvaluating && (
                 <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-600" />
                 </span>
               )}
@@ -137,23 +190,37 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 shadow-xs">
-                  {isAllComplete ? 'Pipeline Completed' : 'Specialist Agent Active'}
+                  {isAllComplete ? 'Pipeline Completed' : hasFailed ? 'Processing Failed' : lifecycleLabel[assessmentStatus ?? 'queued']}
                 </span>
+                {assessmentMode === 'demo' && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-800">
+                    Demo Mode
+                  </span>
+                )}
                 <span className="text-xs text-slate-600 font-medium">
                   Candidate: <strong className="text-slate-900">{studentName}</strong>
                 </span>
+                {assessmentId && (
+                  <span className="text-[11px] text-slate-500 font-mono" title="Assessment ID">
+                    ID: {assessmentId}
+                  </span>
+                )}
               </div>
 
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                 {isAllComplete
                   ? 'All 4 Agents Completed Execution!'
-                  : `${activeAgent.name} is working...`}
+                  : hasFailed
+                    ? 'Assessment could not be completed'
+                    : `${activeAgent.name} is working...`}
               </h2>
 
               <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-xl leading-relaxed">
                 {isAllComplete
                   ? 'Orchestrator synthesized all dimensional analytics into the final Cognitive Assessment Report.'
-                  : agentActivities[activeAgentId] || activeAgent.roleDesc}
+                  : hasFailed
+                    ? requestError || 'Your saved answers are available for a safe retry.'
+                    : agentActivities[activeAgentId] || activeAgent.roleDesc}
               </p>
             </div>
           </div>
@@ -162,8 +229,25 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
           <div className="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end gap-3 shrink-0">
             <div className="flex items-center gap-2 bg-white border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-600 shadow-xs">
               <Clock className="w-3.5 h-3.5 text-blue-600" />
-              <span>Elapsed: <strong className="text-slate-900">{elapsedSeconds}s</strong></span>
+              <span>Elapsed: <strong className="text-slate-900">{activeEventElapsed}s</strong></span>
             </div>
+
+            {isSlowProcessing && (
+              <div role="status" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+                <div>
+                  <p className="font-semibold">Processing is taking longer than usual.</p>
+                  <p className="mt-1 text-amber-800">The server has not reported completion yet. Your saved answers are retained; you can safely refresh the saved status.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshStatus}
+                  disabled={isRefreshingStatus}
+                  className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {isRefreshingStatus ? 'Refreshing status…' : 'Refresh saved status'}
+                </button>
+              </div>
+            )}
 
             {isAllComplete ? (
               <button
@@ -173,15 +257,73 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                 <span>View Full Cognitive Report</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+            ) : hasFailed ? (
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-sm transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Retry saved assessment
+              </button>
             ) : (
               <div className="flex items-center gap-2 text-xs font-medium text-blue-700">
-                <Activity className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                <Activity className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none text-blue-600" />
                 <span>Running multi-agent inference...</span>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {hasFailed && requestError && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{requestError}</span>
+        </div>
+      )}
+
+      <section className="pro-card rounded-2xl p-6 shadow-xs" aria-labelledby="assessment-timeline-title">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
+          <div>
+            <h3 id="assessment-timeline-title" className="text-sm font-bold text-slate-900">
+              Assessment Activity
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Updates are saved by the server and restored when this page is refreshed.
+            </p>
+          </div>
+          {assessmentId && <span className="font-mono text-[11px] text-slate-500">ID {assessmentId}</span>}
+        </div>
+        {progressEvents.length === 0 ? (
+          <p className="py-4 text-center text-xs text-slate-500">Waiting for the first saved progress event.</p>
+        ) : (
+          <ol className="space-y-3">
+            {progressEvents.slice(-12).map((event) => (
+              <li key={event.id} className="flex items-start gap-3">
+                {event.status === 'completed' ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                ) : event.status === 'failed' ? (
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                ) : event.status === 'in_progress' ? (
+                  <Activity className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none text-blue-600" />
+                ) : (
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-800">{event.message}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    <span className="capitalize">{event.stage.replaceAll('_', ' ')}</span>
+                    {' · '}
+                    {new Date(event.timestamp).toLocaleTimeString()}
+                    {' · '}
+                    <span className="capitalize">{event.status.replaceAll('_', ' ')}</span>
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       {/* 2. Sequential Agent Pipeline Cards */}
       <div className="pro-card rounded-2xl p-6 shadow-xs">
@@ -218,8 +360,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.designer === 'running' ? (
-                <span className="text-xs font-semibold text-sky-600 animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-ping" /> Active
+                <span className="text-xs font-semibold text-sky-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-ping motion-reduce:animate-none" /> Active
                 </span>
               ) : (
                 <span className="text-xs text-slate-400">Standby</span>
@@ -230,7 +372,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
               Formulates calibrated reasoning questions.
             </p>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>Groq API</span>
+              <span>{agentRuntime('designer')}</span>
               <span className="text-blue-600 font-semibold flex items-center gap-1">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -257,8 +399,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.analyzer === 'running' ? (
-                <span className="text-xs font-semibold text-blue-600 animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" /> Active
+                <span className="text-xs font-semibold text-blue-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping motion-reduce:animate-none" /> Active
                 </span>
               ) : (
                 <span className="text-xs text-slate-400">Standby</span>
@@ -269,7 +411,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
               Evaluates answers & checks logical fallacies.
             </p>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>Groq API</span>
+              <span>{agentRuntime('analyzer')}</span>
               <span className="text-blue-600 font-semibold flex items-center gap-1">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -296,8 +438,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.coach === 'running' ? (
-                <span className="text-xs font-semibold text-amber-600 animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" /> Active
+                <span className="text-xs font-semibold text-amber-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping motion-reduce:animate-none" /> Active
                 </span>
               ) : (
                 <span className="text-xs text-slate-400">Standby</span>
@@ -308,7 +450,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
               Generates strengths & 3 targeted drills.
             </p>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>Groq API</span>
+              <span>{agentRuntime('coach')}</span>
               <span className="text-blue-600 font-semibold flex items-center gap-1">
                 <Eye className="w-3 h-3" /> Inspect
               </span>
@@ -335,8 +477,8 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5" /> Done
                 </span>
               ) : agentStatuses.orchestrator === 'running' ? (
-                <span className="text-xs font-semibold text-indigo-600 animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" /> Active
+                <span className="text-xs font-semibold text-indigo-600 animate-pulse motion-reduce:animate-none flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping motion-reduce:animate-none" /> Active
                 </span>
               ) : (
                 <span className="text-xs text-slate-400">Standby</span>
@@ -347,7 +489,7 @@ export const AgentWorkingScreen: React.FC<AgentWorkingScreenProps> = ({
               Holistic profile & strategic recommendations.
             </p>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-              <span>Groq API</span>
+              <span>{agentRuntime('orchestrator')}</span>
               <span className="text-blue-600 font-semibold flex items-center gap-1">
                 <Eye className="w-3 h-3" /> Inspect
               </span>

@@ -67,8 +67,8 @@ GROQ_API_KEY=gsk_your_actual_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-> **Tip:** You can get a free Groq API key at [console.groq.com/keys](https://console.groq.com/keys).
-> If no API key is supplied, the application automatically runs in **High-Fidelity Simulation Mode** with realistic latency and cognitive responses, so you can test everything right away!
+> **Tip:** Create a Groq API key at [console.groq.com/keys](https://console.groq.com/keys). Keys are read only by the server; the browser does not accept or store API keys.
+> Without a server key, the app uses deterministic sample behavior marked **Demo Mode**. Demo results are not live AI evaluations.
 
 ### 2. Start the Development Server
 ```bash
@@ -77,20 +77,29 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+Assessments are saved in SQLite at `.data/assessments.sqlite` by default. Set `ASSESSMENT_DB_PATH` to choose another writable path. The default database is local and is not suitable for ephemeral/serverless deployments without a persistent volume.
+
+Assessment records remain in that database until deleted through `DELETE /api/assessments/{assessmentId}`. There is no account system or database encryption; the random assessment ID acts as a bearer token for reading or deleting its data. Use fictional/demo student information until authentication, access controls, and a retention policy are added for shared deployment.
+
+Assessment creation is limited to 10 requests per 15 minutes per forwarded client address. In production, configure the trusted reverse proxy to overwrite `X-Forwarded-For`; requests without that header share a fallback limit bucket. The limit is abuse mitigation, not authentication.
+
 ---
 
 ## 🌟 Key Features
 
 - **Live Agent Pipeline Visualizer**: See nodes pulse and transition states in real time (Standby → Active → Completed).
-- **Inspect Agent Nodes**: Click on any agent card to inspect its exact system prompt, parameters, runtime inputs, and parsed structured JSON outputs.
-- **Streaming Live Terminal Console**: Watch logs, thought traces, and action events stream over Server-Sent Events (SSE).
+- **Inspect Agent Nodes**: Click an agent card to inspect runtime inputs and structured outputs; private prompts and hidden reasoning are not sent to the browser.
+- **Streaming Live Terminal Console**: Watch operational progress events stream over Server-Sent Events (SSE), with lifecycle state persisted for refresh and retry.
 - **One-Click Student Presets**: Test with preset cognitive profiles:
   - *Maya Chen*: High performer with detailed reasoning chains.
   - *Jordan Taylor*: Final answers only (tests Agent 2's evidence guardrail).
   - *Samira Khan*: Intuitive thinker who falls into common heuristic traps.
+- **Configurable Question Sets**: Generate 3–12 questions, choose Bloom levels to target, and require at least one item for every selected level. The default is six questions targeting all six levels.
 - **Cognitive Report View**:
-  - Composite Cognitive Index (0–100).
-  - 4 Dimension scores (Logic, Pattern, Problem-Solving, Reasoning Clarity).
+  - Formative rubric-based score (0–100), not a clinical or norm-referenced measurement.
+  - Six-level Bloom profile with evidence counts and insufficient-evidence states.
   - Evidence-based question diagnostics.
   - Personalized Coaching Roadmap & Practice Drills.
   - Print / Export PDF & Copy Markdown.
+
+The project adapts Bloom-level assessment ideas using Groq/LLM agents. It does not reproduce the paper's SVM or Random Forest models, and no paper accuracy figures are claimed.

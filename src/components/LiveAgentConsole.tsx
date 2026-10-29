@@ -189,9 +189,9 @@ export const LiveAgentConsole: React.FC<LiveAgentConsoleProps> = ({
                 </span>
                 <div className="flex-1 text-slate-300 font-sans text-xs leading-relaxed">
                   {log.message}
-                  {log.details && (
+                  {log.details !== undefined && log.details !== null && (
                     <pre className="mt-1 font-mono text-[11px] text-slate-400 bg-slate-900/90 p-2 rounded border border-slate-800 overflow-x-auto">
-                      {JSON.stringify(log.details, null, 2)}
+                      {JSON.stringify(log.details, null, 2) ?? String(log.details)}
                     </pre>
                   )}
                 </div>

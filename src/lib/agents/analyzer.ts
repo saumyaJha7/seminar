@@ -1,5 +1,10 @@
 import { CognitiveAnalysisResult, Question, StudentAnswer, QuestionEvaluation } from '@/types/assessment';
 import { callGroqChat, extractJSONFromLLMResponse } from '../groq';
+import {
+  AssessmentOutputValidationError,
+  buildCognitiveProfile,
+  validateCognitiveAnalysis,
+} from '../assessment-contracts';
 
 export const ANALYZER_SYSTEM_PROMPT = `You are Agent 2: Cognitive Response Analyzer in a Multi-Agent Student Cognitive Assessment system.
 Your responsibility:
@@ -16,12 +21,10 @@ export async function runCognitiveResponseAnalyzer({
   studentName,
   questions,
   studentAnswers,
-  apiKeyOverride,
 }: {
   studentName: string;
   questions: Question[];
   studentAnswers: StudentAnswer[];
-  apiKeyOverride?: string;
 }): Promise<{ analysis: CognitiveAnalysisResult; rawPrompt: string; rawResponse: string; executionTimeMs: number }> {
   const startTime = Date.now();
 
@@ -36,6 +39,8 @@ export async function runCognitiveResponseAnalyzer({
       category: q.category,
       categoryTitle: q.categoryTitle,
       question: q.question,
+      bloomLevel: q.bloomLevel,
+      evaluationRubric: q.evaluationRubric,
       expectedAnswer: q.expectedAnswer,
       explanation: q.explanation,
       studentAnswer: ans.answer,
@@ -48,27 +53,27 @@ export async function runCognitiveResponseAnalyzer({
 Input Assessment Items & Student Responses:
 ${JSON.stringify(pairs, null, 2)}
 
-Provide your output strictly in JSON format matching this schema:
+Treat blank answers as unavailable evidence. Do not assign them an incorrect score or cite text that the student did not submit.
+
+Return only a JSON object with an "evaluations" array containing exactly one item per input question. Use the same questionId values. Keep all prose fields to one concise sentence. Do not repeat question text, answers, or other input fields in the output.
+
+For evidence, use one or two short, exact quotations copied from the submitted answer or reasoning. Do not paraphrase evidence. If there is no answer, use an empty evidence array and answerCorrectness "unanswered".
+
+The rubricVersion must exactly match the version supplied for that question. Scores are numbers from 0 to 100. Confidence is a number from 0 to 1. Use null for reasoningQualityScore when no reasoning was submitted.
+
+Return strictly in this shape:
 {
-  "studentName": "${studentName}",
-  "overallScore": 85,
-  "categoryScores": {
-    "logicalReasoning": 90,
-    "patternRecognition": 80,
-    "problemSolving": 85
-  },
-  "reasoningClarityScore": 80,
   "evaluations": [
     {
       "questionId": "q1_logical",
-      "category": "logical_reasoning",
-      "categoryTitle": "Logical Reasoning",
-      "question": "...",
-      "expectedAnswer": "...",
-      "studentAnswer": "...",
-      "studentReasoning": "...",
-      "isCorrect": true,
-      "score": 100,
+      "answerCorrectness": "correct",
+      "answerCorrectnessScore": 100,
+      "reasoningQualityScore": 80,
+      "confidence": 0.9,
+      "rubricVersion": "1.0",
+      "evidence": ["exact short quote"],
+      "misconceptions": [],
+      "feedback": "Concise feedback tied to the rubric.",
       "cognitiveErrorAnalysis": "Specific analysis of any errors or logical flaws based on evidence.",
       "demonstratedStrengths": "Specific reasoning strengths observed directly from student response.",
       "evidenceNotes": "Evidence citation from student answer."
@@ -76,27 +81,65 @@ Provide your output strictly in JSON format matching this schema:
   ]
 }`;
 
-  try {
-    const rawResponse = await callGroqChat({
-      messages: [
-        { role: 'system', content: ANALYZER_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.2,
-      apiKeyOverride,
-    });
-
-    const parsed = extractJSONFromLLMResponse<CognitiveAnalysisResult>(rawResponse);
-    const executionTimeMs = Date.now() - startTime;
-
+  if (!studentAnswers.some((answer) => answer.answer.trim().length > 0)) {
+    const analysis = getSimulatedCognitiveAnalysis(studentName, questions, studentAnswers);
     return {
-      analysis: parsed,
+      analysis,
       rawPrompt: userPrompt,
-      rawResponse,
-      executionTimeMs,
+      rawResponse: JSON.stringify(analysis, null, 2),
+      executionTimeMs: Date.now() - startTime,
     };
-  } catch (error: any) {
-    if (error?.message === 'GROQ_API_KEY_NOT_CONFIGURED') {
+  }
+
+  try {
+    let validationError: AssessmentOutputValidationError | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const attemptPrompt = attempt === 0
+        ? userPrompt
+        : `${userPrompt}\n\nYour previous response did not match the required evaluation schema. Return the complete JSON object again, with exactly one concise evaluation per question, exact submitted-text evidence, and no extra fields.`;
+      const rawResponse = await callGroqChat({
+        messages: [
+          { role: 'system', content: ANALYZER_SYSTEM_PROMPT },
+          { role: 'user', content: attemptPrompt },
+        ],
+        temperature: 0.2,
+        max_tokens: Math.min(8192, Math.max(2048, questions.length * 700)),
+      });
+
+      let rawAnalysis: unknown;
+      try {
+        rawAnalysis = extractJSONFromLLMResponse<unknown>(rawResponse);
+      } catch {
+        validationError = new AssessmentOutputValidationError(
+          'The response evaluator returned invalid structured output.',
+        );
+        continue;
+      }
+
+      try {
+        const analysis = validateCognitiveAnalysis(
+          rawAnalysis,
+          questions,
+          studentAnswers,
+          studentName,
+        );
+        return {
+          analysis,
+          rawPrompt: attemptPrompt,
+          rawResponse,
+          executionTimeMs: Date.now() - startTime,
+        };
+      } catch (error: unknown) {
+        if (!(error instanceof AssessmentOutputValidationError)) throw error;
+        validationError = error;
+      }
+    }
+
+    throw validationError ?? new AssessmentOutputValidationError(
+      'The response evaluator could not return a valid evaluation.',
+    );
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'GROQ_API_KEY_NOT_CONFIGURED') {
       const simulated = getSimulatedCognitiveAnalysis(studentName, questions, studentAnswers);
       const executionTimeMs = Date.now() - startTime;
       return {
@@ -124,14 +167,14 @@ export function getSimulatedCognitiveAnalysis(
     const isBlank = !rawAnswer;
     const hasReasoning = Boolean(rawReasoning && rawReasoning.length > 5);
 
-    let isCorrect: boolean | 'partial' = true;
+    let isCorrect: QuestionEvaluation['isCorrect'] = true;
     let score = 90;
     let cognitiveErrorAnalysis = 'No cognitive missteps detected. The student correctly reconciled the constraints.';
     let demonstratedStrengths = 'Clear deductive synthesis and accurate rule following.';
     let evidenceNotes = 'The student directly arrived at the expected deduction.';
 
     if (isBlank) {
-      isCorrect = false;
+      isCorrect = 'unanswered';
       score = 0;
       cognitiveErrorAnalysis = 'No response was provided. Cannot evaluate cognitive mechanisms.';
       demonstratedStrengths = 'None demonstrated.';
@@ -183,35 +226,61 @@ export function getSimulatedCognitiveAnalysis(
 
     if (!hasReasoning && !isBlank) {
       evidenceNotes += ' (Note: Student supplied only final answer; internal reasoning steps were not articulated).';
+      cognitiveErrorAnalysis = 'Only a final answer was provided; the student’s reasoning cannot be inferred.';
+      demonstratedStrengths = 'The final answer is recorded; no reasoning strategy can be assessed without an explanation.';
     }
 
     return {
       questionId: q.id,
       category: q.category,
       categoryTitle: q.categoryTitle,
+      bloomLevel: q.bloomLevel,
       question: q.question,
       expectedAnswer: q.expectedAnswer,
       studentAnswer: rawAnswer || 'No answer submitted',
       studentReasoning: rawReasoning || (isBlank ? 'None' : 'Final answer only without reasoning trace'),
       isCorrect,
       score,
+      answerCorrectness: isBlank ? 'unanswered' : isCorrect === true ? 'correct' : isCorrect === 'partial' ? 'partially_correct' : 'incorrect',
+      answerCorrectnessScore: score,
+      reasoningQualityScore: hasReasoning ? (isCorrect === true ? 85 : isCorrect === 'partial' ? 55 : 30) : null,
+      evidence: [rawAnswer, ...(hasReasoning ? [rawReasoning] : [])].filter(Boolean),
+      misconceptions: hasReasoning && (isCorrect === false || isCorrect === 'partial') ? [cognitiveErrorAnalysis] : [],
+      confidence: isBlank ? 1 : hasReasoning ? 0.8 : 0.6,
+      rubricVersion: q.evaluationRubric.version,
+      feedback: isBlank
+        ? 'No answer was provided, so this item could not be evaluated.'
+        : hasReasoning
+          ? `${score >= 75 ? 'The response meets' : 'The response partially meets'} the ${q.bloomLevel} objective.`
+          : 'The final answer was recorded, but reasoning quality cannot be assessed without an explanation.',
       cognitiveErrorAnalysis,
       demonstratedStrengths,
       evidenceNotes,
     };
   });
 
-  const avg = Math.round(evaluations.reduce((acc, curr) => acc + curr.score, 0) / evaluations.length);
+  const answeredEvaluations = evaluations.filter(
+    (evaluation) => evaluation.answerCorrectness !== 'unanswered',
+  );
+  const avg = answeredEvaluations.length > 0
+    ? Math.round(answeredEvaluations.reduce((total, evaluation) => total + evaluation.score, 0) / answeredEvaluations.length)
+    : 0;
+  const reasoningScores = evaluations
+    .map((evaluation) => evaluation.reasoningQualityScore)
+    .filter((score): score is number => score !== null);
 
   return {
     studentName,
     overallScore: avg,
     categoryScores: {
-      logicalReasoning: evaluations.find((e) => e.category === 'logical_reasoning')?.score ?? 85,
-      patternRecognition: evaluations.find((e) => e.category === 'pattern_recognition')?.score ?? 85,
-      problemSolving: evaluations.find((e) => e.category === 'problem_solving')?.score ?? 85,
+      logicalReasoning: answeredEvaluations.find((e) => e.category === 'logical_reasoning')?.score ?? 0,
+      patternRecognition: answeredEvaluations.find((e) => e.category === 'pattern_recognition')?.score ?? 0,
+      problemSolving: answeredEvaluations.find((e) => e.category === 'problem_solving')?.score ?? 0,
     },
-    reasoningClarityScore: studentAnswers.some((a) => a.reasoning && a.reasoning.length > 10) ? 88 : 65,
+    cognitiveProfile: buildCognitiveProfile(evaluations, questions),
+    reasoningClarityScore: reasoningScores.length > 0
+      ? Math.round(reasoningScores.reduce((total, score) => total + score, 0) / reasoningScores.length)
+      : null,
     evaluations,
   };
 }

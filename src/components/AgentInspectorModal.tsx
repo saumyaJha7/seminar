@@ -3,17 +3,13 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Cpu, Clock } from 'lucide-react';
 import { AgentId } from '@/types/assessment';
-import { DESIGNER_SYSTEM_PROMPT } from '@/lib/agents/designer';
-import { ANALYZER_SYSTEM_PROMPT } from '@/lib/agents/analyzer';
-import { COACH_SYSTEM_PROMPT } from '@/lib/agents/coach';
-import { ORCHESTRATOR_SYSTEM_PROMPT } from '@/lib/agents/orchestrator';
 
 interface AgentInspectorModalProps {
   agentId: AgentId | null;
   onClose: () => void;
   agentData?: {
-    input?: any;
-    output?: any;
+    input?: unknown;
+    output?: unknown;
     executionTimeMs?: number;
     status?: string;
   };
@@ -25,7 +21,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
   agentData,
 }) => {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'prompt' | 'input' | 'output'>('prompt');
+  const [activeTab, setActiveTab] = useState<'role' | 'input' | 'output'>('role');
 
   if (!agentId) return null;
 
@@ -36,7 +32,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
           name: 'Orchestrator Agent',
           role: 'Workflow Manager & Synthesis Engine',
           model: 'openai/gpt-oss-120b',
-          prompt: ORCHESTRATOR_SYSTEM_PROMPT,
+          description: 'Coordinates assessment stages and combines validated results into a report.',
           badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200',
         };
       case 'designer':
@@ -44,7 +40,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
           name: 'Agent 1: Assessment Designer',
           role: 'Reasoning Item Formulator',
           model: 'openai/gpt-oss-120b',
-          prompt: DESIGNER_SYSTEM_PROMPT,
+          description: 'Creates reasoning questions and assigns each question a Bloom level and evaluation rubric.',
           badgeColor: 'bg-sky-50 text-sky-800 border-sky-200',
         };
       case 'analyzer':
@@ -52,7 +48,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
           name: 'Agent 2: Cognitive Response Analyzer',
           role: 'Evidence & Error Diagnostician',
           model: 'openai/gpt-oss-120b',
-          prompt: ANALYZER_SYSTEM_PROMPT,
+          description: 'Evaluates submitted answers against the rubric and cites only evidence in the student response.',
           badgeColor: 'bg-blue-50 text-blue-800 border-blue-200',
         };
       case 'coach':
@@ -60,7 +56,7 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
           name: 'Agent 3: Feedback Coach',
           role: 'Growth Strategy Architect',
           model: 'openai/gpt-oss-120b',
-          prompt: COACH_SYSTEM_PROMPT,
+          description: 'Turns observed response evidence into non-clinical feedback and practice suggestions.',
           badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
         };
     }
@@ -75,25 +71,14 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
   };
 
   const renderContent = () => {
-    if (activeTab === 'prompt') {
+    if (activeTab === 'role') {
       return (
         <div className="relative">
           <div className="flex items-center justify-between pb-2 mb-2 text-xs text-slate-500 border-b border-slate-200">
-            <span>System Instruction & Framing</span>
-            <button
-              onClick={() => copyToClipboard(config.prompt, 'prompt')}
-              className="flex items-center gap-1 text-blue-700 hover:text-blue-900 transition font-semibold"
-            >
-              {copiedTab === 'prompt' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-              {copiedTab === 'prompt' ? 'Copied' : 'Copy Prompt'}
-            </button>
+            <span>Public Agent Responsibility</span>
           </div>
           <pre className="font-mono text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-slate-900 p-4 rounded-xl border border-slate-800 max-h-[350px] overflow-y-auto">
-            {config.prompt}
+            {config.description}
           </pre>
         </div>
       );
@@ -189,14 +174,14 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
         {/* Tab Controls */}
         <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-200 bg-white">
           <button
-            onClick={() => setActiveTab('prompt')}
+            onClick={() => setActiveTab('role')}
             className={`px-3 py-2 text-xs font-bold transition border-b-2 ${
-              activeTab === 'prompt'
+              activeTab === 'role'
                 ? 'text-blue-700 border-blue-600'
                 : 'text-slate-500 border-transparent hover:text-slate-800'
             }`}
           >
-            System Instruction
+            Agent Role
           </button>
           <button
             onClick={() => setActiveTab('input')}

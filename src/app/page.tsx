@@ -4,22 +4,34 @@ import React from 'react';
 import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
 import { useAssessment } from '@/context/AssessmentContext';
 import { Sparkles, Info } from 'lucide-react';
-import { getSimulatedQuestions } from '@/lib/agents/designer';
 
 export default function HomePage() {
   const {
     questions,
-    setQuestions,
     generateQuestions,
     startAssessment,
     isGeneratingQuestions,
     isEvaluating,
     hasServerGroqKey,
-    clientGroqKey,
     setIsApiKeyModalOpen,
+    assessmentId,
+    requestError,
+    studentName,
+    setStudentName,
+    gradeLevel,
+    setGradeLevel,
+    difficulty,
+    setDifficulty,
+    focusArea,
+    setFocusArea,
+    questionCount,
+    setQuestionCount,
+    targetBloomLevels,
+    setTargetBloomLevels,
+    resetAssessment,
   } = useAssessment();
 
-  const isGroqConnected = Boolean(hasServerGroqKey || clientGroqKey);
+  const isGroqConnected = hasServerGroqKey;
 
   return (
     <div className="space-y-6">
@@ -55,13 +67,25 @@ export default function HomePage() {
       {/* Main Workflow Form */}
       <AssessmentWorkflow
         questions={questions}
+        assessmentId={assessmentId}
+        requestError={requestError}
+        studentName={studentName}
+        setStudentName={setStudentName}
+        gradeLevel={gradeLevel}
+        setGradeLevel={setGradeLevel}
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        focusArea={focusArea}
+        setFocusArea={setFocusArea}
+        questionCount={questionCount}
+        setQuestionCount={setQuestionCount}
+        targetBloomLevels={targetBloomLevels}
+        setTargetBloomLevels={setTargetBloomLevels}
         onGenerateQuestions={generateQuestions}
         onSubmitAssessment={startAssessment}
         isGeneratingQuestions={isGeneratingQuestions}
         isEvaluating={isEvaluating}
-        onReset={() => {
-          setQuestions(getSimulatedQuestions('intermediate'));
-        }}
+        onReset={resetAssessment}
       />
     </div>
   );

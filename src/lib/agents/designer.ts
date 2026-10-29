@@ -1,15 +1,22 @@
-import { Question } from '@/types/assessment';
+import { BloomLevel, Question, QuestionCategory } from '@/types/assessment';
 import { callGroqChat, extractJSONFromLLMResponse } from '../groq';
+import {
+  AssessmentOutputValidationError,
+  createEvaluationRubric,
+  validateGeneratedQuestions,
+} from '../assessment-contracts';
 
 export interface AssessmentDesignerInput {
   gradeLevel?: string;
   focusArea?: string;
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  questionCount?: number;
+  targetBloomLevels?: BloomLevel[];
 }
 
 export const DESIGNER_SYSTEM_PROMPT = `You are Agent 1: Assessment Designer in a Multi-Agent Student Cognitive Assessment system.
 Your responsibility:
-- Generate exactly 3 short reasoning questions:
+- Generate the requested number of short reasoning questions:
   1. Logical reasoning (deductive or conditional logic).
   2. Pattern recognition (sequence, analogy, or symbolic pattern).
   3. Problem-solving (practical situational deduction or multi-step logic).
@@ -17,77 +24,91 @@ Your responsibility:
   - An unambiguous question prompt.
   - The precise expected answer.
   - A brief, clear explanation of the underlying reasoning principle.
-- Keep questions unambiguous, fair, and easy to evaluate objectively.
+- Use only the requested Bloom levels and include each requested level at least once.
+- Cover all three reasoning categories at least once; additional questions may reuse categories.
+- Keep every question distinct, unambiguous, fair, and easy to evaluate objectively.
 - Output MUST be valid JSON adhering strictly to the requested schema.`;
 
 export async function runAssessmentDesigner(
   input: AssessmentDesignerInput = {},
-  apiKeyOverride?: string
 ): Promise<{ questions: Question[]; rawPrompt: string; rawResponse: string; executionTimeMs: number }> {
   const startTime = Date.now();
   const difficulty = input.difficulty || 'intermediate';
   const gradeLevel = input.gradeLevel || 'Secondary / High School';
   const focusArea = input.focusArea || 'General Cognitive & Analytical Reasoning';
+  const questionCount = input.questionCount ?? 3;
+  const targetBloomLevels = input.targetBloomLevels ?? ['analyze', 'evaluate'];
 
-  const userPrompt = `Generate a 3-question cognitive reasoning assessment for a student at level: ${gradeLevel}, difficulty: ${difficulty}, focus: ${focusArea}.
+  const userPrompt = `Generate exactly ${questionCount} distinct questions for a student at level: ${gradeLevel}, difficulty: ${difficulty}, focus: ${focusArea}.
 
-Output your response strictly as a JSON object with this exact structure:
+Include all three categories (logical_reasoning, pattern_recognition, problem_solving) at least once. Use only these Bloom levels and include every listed level at least once: ${targetBloomLevels.join(', ')}. Additional questions may reuse categories and Bloom levels.
+
+Output strictly as a JSON object with a "questions" array containing exactly ${questionCount} objects, each following this structure:
 {
-  "questions": [
-    {
-      "id": "q1_logical",
-      "category": "logical_reasoning",
-      "categoryTitle": "Logical Reasoning",
-      "question": "Clear logic problem text...",
-      "expectedAnswer": "Exact or ideal concise answer",
-      "explanation": "Brief explanation of the logic rule and why this answer is correct."
-    },
-    {
-      "id": "q2_pattern",
-      "category": "pattern_recognition",
-      "categoryTitle": "Pattern Recognition",
-      "question": "Clear pattern/sequence problem text...",
-      "expectedAnswer": "The missing item or next element",
-      "explanation": "Brief explanation of the governing rule or interval formula."
-    },
-    {
-      "id": "q3_problem_solving",
-      "category": "problem_solving",
-      "categoryTitle": "Problem Solving",
-      "question": "Practical multi-step reasoning problem text...",
-      "expectedAnswer": "Concise solution or outcome",
-      "explanation": "Brief explanation of the optimal strategy and solution path."
-    }
-  ]
+  "questions": [{
+    "id": "unique_question_id",
+    "category": "logical_reasoning | pattern_recognition | problem_solving",
+    "categoryTitle": "Human-readable category",
+    "bloomLevel": "${targetBloomLevels[0]}",
+    "question": "Clear, self-contained question prompt",
+    "expectedAnswer": "Answer criteria or acceptable outcome",
+    "explanation": "Brief explanation of the reasoning objective"
+  }]
 }`;
 
-  try {
+  const generateOnce = async () => {
     const rawResponse = await callGroqChat({
       messages: [
         { role: 'system', content: DESIGNER_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.3,
-      apiKeyOverride,
     });
 
-    const parsed = extractJSONFromLLMResponse<{ questions: Question[] }>(rawResponse);
+    let parsed: unknown;
+    try {
+      parsed = extractJSONFromLLMResponse<unknown>(rawResponse);
+    } catch {
+      throw new AssessmentOutputValidationError('Question generation returned invalid JSON.');
+    }
+
+    return {
+      rawResponse,
+      questions: validateGeneratedQuestions(parsed, difficulty, focusArea, {
+        questionCount,
+        targetBloomLevels,
+      }),
+    };
+  };
+
+  try {
+    let generated: Awaited<ReturnType<typeof generateOnce>>;
+    try {
+      generated = await generateOnce();
+    } catch (error) {
+      if (!(error instanceof AssessmentOutputValidationError)) throw error;
+      generated = await generateOnce();
+    }
     const executionTimeMs = Date.now() - startTime;
 
     return {
-      questions: parsed.questions,
+      questions: generated.questions,
       rawPrompt: userPrompt,
-      rawResponse,
+      rawResponse: generated.rawResponse,
       executionTimeMs,
     };
-  } catch (error: any) {
-    if (error?.message === 'GROQ_API_KEY_NOT_CONFIGURED') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'GROQ_API_KEY_NOT_CONFIGURED') {
       // Return high quality simulation questions
       const executionTimeMs = Date.now() - startTime;
       return {
-        questions: getSimulatedQuestions(difficulty),
+        questions: getSimulatedQuestions(difficulty, questionCount, targetBloomLevels, focusArea),
         rawPrompt: userPrompt,
-        rawResponse: JSON.stringify({ questions: getSimulatedQuestions(difficulty) }, null, 2),
+        rawResponse: JSON.stringify(
+          { questions: getSimulatedQuestions(difficulty, questionCount, targetBloomLevels, focusArea) },
+          null,
+          2,
+        ),
         executionTimeMs,
       };
     }
@@ -95,60 +116,198 @@ Output your response strictly as a JSON object with this exact structure:
   }
 }
 
-export function getSimulatedQuestions(difficulty: string = 'intermediate'): Question[] {
-  if (difficulty === 'advanced') {
-    return [
-      {
-        id: 'q1_logical',
-        category: 'logical_reasoning',
-        categoryTitle: 'Logical Reasoning',
-        question: 'All quantum researchers at Lab X are physicists. None of the visiting scholars are physicists. Dr. Miller is a visiting scholar. Can Dr. Miller be a quantum researcher at Lab X?',
-        expectedAnswer: 'No, Dr. Miller cannot be a quantum researcher at Lab X.',
-        explanation: 'By deductive logic: All researchers are physicists; Dr. Miller is a visiting scholar and therefore not a physicist; thus Dr. Miller cannot be a quantum researcher.'
-      },
-      {
-        id: 'q2_pattern',
-        category: 'pattern_recognition',
-        categoryTitle: 'Pattern Recognition',
-        question: 'Identify the next number in this sequence: 3, 7, 15, 31, 63, ?',
-        expectedAnswer: '127',
-        explanation: 'Each term is generated by (previous term × 2) + 1, or alternatively adding successive powers of 2 (4, 8, 16, 32, 64; 63 + 64 = 127).'
-      },
-      {
-        id: 'q3_problem_solving',
-        category: 'problem_solving',
-        categoryTitle: 'Problem Solving',
-        question: 'You have a 5-liter jug and a 3-liter jug with an unlimited water supply. Neither jug has measurement markings. How can you measure exactly 4 liters using the fewest steps?',
-        expectedAnswer: 'Fill the 5L jug completely, pour into the 3L jug until full (leaving 2L in the 5L jug). Empty the 3L jug, transfer the 2L into the 3L jug, fill the 5L jug again, and pour into the 3L jug until full (adding 1L). Exactly 4L remains in the 5L jug.',
-        explanation: 'Involves multi-step volume invariant deduction: 5 - 3 = 2L remaining; 2L + (5 - 1L) = 4L in the large container.'
-      }
+const DEMO_CATEGORIES: { category: QuestionCategory; title: string }[] = [
+  { category: 'logical_reasoning', title: 'Logical Reasoning' },
+  { category: 'pattern_recognition', title: 'Pattern Recognition' },
+  { category: 'problem_solving', title: 'Problem Solving' },
+];
+
+const DEMO_NAMES = [
+  ['Alex', 'Liam', 'Maya'],
+  ['Riley', 'Jordan', 'Casey'],
+  ['Ari', 'Sam', 'Taylor'],
+  ['Noah', 'Sofia', 'Evan'],
+];
+
+function createDemoQuestion(
+  categoryIndex: number,
+  variant: number,
+  bloomLevel: BloomLevel,
+  difficulty: string,
+  topic: string,
+): Question {
+  const { category, title } = DEMO_CATEGORIES[categoryIndex];
+  const [first, second, third] = DEMO_NAMES[variant];
+  let scenario: string;
+  let question: string;
+  let expectedAnswer: string;
+  let explanation: string;
+
+  if (category === 'logical_reasoning') {
+    const groups = ['debate club', 'robotics team', 'science group', 'library committee'];
+    const traits = [
+      { plural: 'avid readers', singular: 'an avid reader' },
+      { plural: 'trained participants', singular: 'a trained participant' },
+      { plural: 'registered volunteers', singular: 'a registered volunteer' },
+      { plural: 'active volunteers', singular: 'an active volunteer' },
     ];
+    const group = groups[variant];
+    const trait = traits[variant];
+    scenario = `All members of the ${group} are ${trait.plural}. ${first} is a member of the ${group}. ${second} is not ${trait.singular}.`;
+    const tasks: Record<BloomLevel, { prompt: string; answer: string; explanation: string }> = {
+      remember: {
+        prompt: 'State the rule that applies to members of this group.',
+        answer: `Every member of the ${group} is ${trait.singular}.`,
+        explanation: 'The response recalls the universal rule stated in the scenario.',
+      },
+      understand: {
+        prompt: `Explain what the rule tells us about ${first}.`,
+        answer: `${first} is ${trait.singular} because ${first} is a member of the ${group}.`,
+        explanation: 'The response interprets the universal rule in the context of a named member.',
+      },
+      apply: {
+        prompt: `Apply the rule to determine whether ${first} is ${trait.singular}.`,
+        answer: `Yes. ${first} is ${trait.singular}.`,
+        explanation: 'The response applies the given implication to a specific case.',
+      },
+      analyze: {
+        prompt: `Can ${second} be a member of the ${group}? Explain using the stated rule.`,
+        answer: `No. Membership implies being ${trait.singular}, so someone who is not ${trait.singular} cannot be a member.`,
+        explanation: 'The response uses the contrapositive of the stated implication.',
+      },
+      evaluate: {
+        prompt: `A student claims that ${second} could still be a member of the ${group}. Evaluate the claim using only the scenario.`,
+        answer: `The claim is inconsistent with the rule: all members are ${trait.plural}, but ${second} is not ${trait.singular}.`,
+        explanation: 'The response judges a claim against the premises and avoids adding assumptions.',
+      },
+      create: {
+        prompt: `Write one conclusion about ${first} and one conclusion about ${second} that follow from the scenario.`,
+        answer: `${first} is ${trait.singular}, and ${second} is not a member of the ${group}.`,
+        explanation: 'The response constructs two conclusions supported by the stated implication.',
+      },
+    };
+    const task = tasks[bloomLevel];
+    question = `${scenario} ${task.prompt}`;
+    expectedAnswer = task.answer;
+    explanation = task.explanation;
+  } else if (category === 'pattern_recognition') {
+    const start = variant + 2;
+    const increment = variant + 1;
+    const terms = [start];
+    for (let index = 0; index < 4; index += 1) {
+      terms.push(terms[index] * 2 + increment);
+    }
+    const next = terms[terms.length - 1] * 2 + increment;
+    const sequence = terms.join(', ');
+    const tasks: Record<BloomLevel, { prompt: string; answer: string; explanation: string }> = {
+      remember: {
+        prompt: `Recall the next term in this sequence: ${sequence}, ?`,
+        answer: String(next),
+        explanation: `Each term is twice the previous term plus ${increment}.`,
+      },
+      understand: {
+        prompt: `Explain the rule in the sequence ${sequence}, then give its next term.`,
+        answer: `Multiply by 2 and add ${increment}; the next term is ${next}.`,
+        explanation: 'The response explains the repeated relationship and its result.',
+      },
+      apply: {
+        prompt: `The sequence ${sequence} follows the rule “multiply by 2, then add ${increment}.” Apply the rule to find the next term.`,
+        answer: String(next),
+        explanation: 'The response applies the explicitly stated operation to the final term.',
+      },
+      analyze: {
+        prompt: `Analyze the sequence ${sequence}. What consistent operation connects each term, and what comes next?`,
+        answer: `Multiply by 2 and add ${increment}; the next term is ${next}.`,
+        explanation: 'The response identifies the operation that accounts for each transition.',
+      },
+      evaluate: {
+        prompt: `For the sequence ${sequence}, a student predicts ${next + 1} next. Evaluate this prediction using the rule “multiply by 2, then add ${increment}.”`,
+        answer: `The prediction is incorrect; applying the rule gives ${next}.`,
+        explanation: 'The response tests a proposed value against the defined operation.',
+      },
+      create: {
+        prompt: `Continue the sequence ${sequence} for two terms and describe the rule you used.`,
+        answer: `The next terms are ${next} and ${next * 2 + increment}; multiply each term by 2 and add ${increment}.`,
+        explanation: 'The response constructs additional terms that consistently follow the sequence rule.',
+      },
+    };
+    const task = tasks[bloomLevel];
+    question = task.prompt;
+    expectedAnswer = task.answer;
+    explanation = task.explanation;
+  } else {
+    const scenario = `${first}, ${second}, and ${third} finished first, second, and third in a contest. ${first} finished ahead of ${second}, and ${third} finished second.`;
+    const order = `${first} first, ${third} second, ${second} third`;
+    const tasks: Record<BloomLevel, { prompt: string; answer: string; explanation: string }> = {
+      remember: {
+        prompt: 'Which contestant is explicitly stated to have finished second?',
+        answer: third,
+        explanation: 'The response recalls the placement explicitly stated in the scenario.',
+      },
+      understand: {
+        prompt: 'Explain how the stated placements constrain the final order.',
+        answer: `${third} is second; because ${first} is ahead of ${second}, ${first} must be first and ${second} third.`,
+        explanation: 'The response interprets both constraints and relates them to the complete order.',
+      },
+      apply: {
+        prompt: 'Apply the two constraints to determine the finishing order.',
+        answer: order,
+        explanation: 'The response applies the explicit placement and ordering constraints.',
+      },
+      analyze: {
+        prompt: 'Analyze the constraints and list the only finishing order that satisfies both.',
+        answer: order,
+        explanation: 'The response combines the fixed second place with the relative ordering constraint.',
+      },
+      evaluate: {
+        prompt: `A student proposes this order: ${second} first, ${third} second, ${first} third. Evaluate it against both constraints.`,
+        answer: `It is invalid because ${first} would finish after ${second}, contrary to the condition. The valid order is ${order}.`,
+        explanation: 'The response checks a proposed solution against each stated constraint.',
+      },
+      create: {
+        prompt: `Give a valid finishing order and add one additional constraint that remains true for that order.`,
+        answer: `A valid order is ${order}; for example, ${first} finished before ${second}.`,
+        explanation: 'The response constructs a solution that satisfies the original constraints and adds a consistent one.',
+      },
+    };
+    const task = tasks[bloomLevel];
+    question = `${scenario} ${task.prompt}`;
+    expectedAnswer = task.answer;
+    explanation = task.explanation;
   }
 
-  return [
-    {
-      id: 'q1_logical',
-      category: 'logical_reasoning',
-      categoryTitle: 'Logical Reasoning',
-      question: 'In a school club, all debate members are avid readers. Alex is a debate member. Liam is not an avid reader. Is Liam in the debate club, and is Alex an avid reader?',
-      expectedAnswer: 'Liam is not in the debate club, and Alex is an avid reader.',
-      explanation: 'Since all debate members are avid readers, anyone who is in debate must be a reader (Alex is). Contrapositive: if Liam is not a reader, Liam cannot be a debate member.'
-    },
-    {
-      id: 'q2_pattern',
-      category: 'pattern_recognition',
-      categoryTitle: 'Pattern Recognition',
-      question: 'Find the next term in the sequence: 4, 9, 19, 39, 79, ?',
-      expectedAnswer: '159',
-      explanation: 'The pattern is: Multiply previous number by 2 and add 1 (or differences: 5, 10, 20, 40, 80; 79 + 80 = 159).'
-    },
-    {
-      id: 'q3_problem_solving',
-      category: 'problem_solving',
-      categoryTitle: 'Problem Solving',
-      question: 'Three friends (Maya, Noah, and Sofia) finished 1st, 2nd, and 3rd in a math tournament. Sofia did not finish 3rd. Maya finished ahead of Sofia. Who finished in 1st, 2nd, and 3rd place?',
-      expectedAnswer: '1st: Maya, 2nd: Sofia, 3rd: Noah',
-      explanation: 'Maya finished ahead of Sofia, so Maya cannot be 3rd and Sofia cannot be 1st. Sofia is not 3rd, so Sofia must be 2nd. Thus Maya is 1st and Noah takes 3rd.'
-    }
-  ];
+  return {
+    id: `demo_${category}_${variant + 1}_${bloomLevel}`,
+    category,
+    categoryTitle: title,
+    question,
+    expectedAnswer,
+    explanation,
+    difficulty: difficulty === 'beginner' || difficulty === 'advanced' ? difficulty : 'intermediate',
+    bloomLevel,
+    evaluationRubric: createEvaluationRubric(bloomLevel),
+    topic,
+    source: 'demo',
+  };
+}
+
+export function getSimulatedQuestions(
+  difficulty: string = 'intermediate',
+  questionCount = 3,
+  targetBloomLevels: BloomLevel[] = ['analyze', 'evaluate'],
+  topic = 'General Cognitive & Analytical Reasoning',
+): Question[] {
+  const questions: Question[] = [];
+  for (let index = 0; index < questionCount; index += 1) {
+    questions.push(
+      createDemoQuestion(
+        index % DEMO_CATEGORIES.length,
+        Math.floor(index / DEMO_CATEGORIES.length),
+        targetBloomLevels[index % targetBloomLevels.length],
+        difficulty,
+        topic,
+      ),
+    );
+  }
+  return questions;
 }
